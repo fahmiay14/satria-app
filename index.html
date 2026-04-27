@@ -692,6 +692,7 @@
             unsubArsip = onSnapshot(arsipRef, (snapshot) => {
                 dbArsip = [];
                 snapshot.forEach(doc => dbArsip.push({ id: doc.id, ...doc.data() }));
+                // Sort Descending by ID to get newest first
                 dbArsip.sort((a, b) => b.id.localeCompare(a.id));
                 window.renderTableArsip();
                 window.showLoading(false);
@@ -775,7 +776,7 @@
         };
 
         // ===============================================
-        // FUNGSI IMPORT & EXPORT CSV (BARU)
+        // FUNGSI IMPORT & EXPORT CSV
         // ===============================================
         window.importCSV = async function(event) {
             const file = event.target.files[0];
@@ -785,7 +786,6 @@
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const text = e.target.result;
-                // Memisahkan baris berdasarkan Enter (mendukung format Windows/Mac/Linux)
                 const rows = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
                 
                 if (rows.length < 2) return window.showToast("File CSV kosong atau tidak valid", "error");
@@ -793,18 +793,17 @@
                 window.showLoading(true, "Mengimpor Data...");
                 
                 try {
-                    let batch = writeBatch(db); // Menggunakan batch agar tidak limit Firebase
+                    let batch = writeBatch(db); 
                     let count = 0;
                     let totalImported = 0;
 
-                    // Mulai dari i=1 untuk melewati baris header (Nomor Surat,Nopol,Status)
                     for (let i = 1; i < rows.length; i++) {
                         const cols = rows[i].split(',').map(col => col.replace(/(^"|"$)/g, '').trim());
                         
-                        if (cols.length >= 2) { // Minimal ada No Surat dan Nopol
+                        if (cols.length >= 2) { 
                             const noSurat = cols[0];
                             const nopol = cols[1].toUpperCase();
-                            const status = cols[2] || 'Tersedia'; // Default Tersedia jika kosong
+                            const status = cols[2] || 'Tersedia'; 
                             const id = "ARSIP-IMP-" + Date.now() + "-" + i;
 
                             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'arsip', id);
@@ -817,7 +816,6 @@
                             count++;
                             totalImported++;
 
-                            // Firebase batch max adalah 500 operasi, jadi kita commit setiap 500
                             if (count === 500) {
                                 await batch.commit();
                                 batch = writeBatch(db);
@@ -826,7 +824,6 @@
                         }
                     }
                     
-                    // Commit sisa data yang belum mencapai 500
                     if (count > 0) {
                         await batch.commit();
                     }
@@ -837,7 +834,7 @@
                     window.showToast("Terjadi error saat mengimpor", "error");
                 }
                 
-                event.target.value = ''; // Reset input file
+                event.target.value = ''; 
                 window.showLoading(false);
             };
             reader.readAsText(file);
@@ -846,10 +843,7 @@
         window.exportCSV = function() {
             if (dbArsip.length === 0) return window.showToast("Tidak ada data untuk diekspor", "error");
             
-            // Membuat Header CSV
             let csvContent = "Nomor Surat,Nopol,Status\n";
-            
-            // Memasukkan isi data
             dbArsip.forEach(row => {
                 const noSurat = row['Nomor Surat'] || '';
                 const nopol = row['Nopol'] || '';
@@ -857,7 +851,6 @@
                 csvContent += `"${noSurat}","${nopol}","${status}"\n`;
             });
             
-            // Proses Download File CSV di Browser
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
@@ -874,26 +867,33 @@
         };
 
         // ===============================================
-        // RENDER UI & UTILITY (READ DATA)
+        // RENDER UI & UTILITY (DENGAN OPTIMASI KECEPATAN)
         // ===============================================
         window.renderTableArsip = function() {
             const tbody = document.getElementById('tabel-data-arsip');
             if(!tbody) return;
-            tbody.innerHTML = '';
-            
+
             if(dbArsip.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Belum ada data arsip.</td></tr>`;
                 return;
             }
 
-            dbArsip.forEach(item => {
+            // OPTIMASI: Hanya merender 100 data terbaru di memori ke layar HTML
+            // Tujuannya agar browser (Chrome/Safari) tidak error/freeze saat disuruh menggambar ulang 7000+ data sekaligus.
+            // Sisa 6900+ data lainnya tetap tersembunyi aman di memori HP untuk digunakan saat "Pencarian".
+            const dataToRender = dbArsip.slice(0, 100);
+            
+            // OPTIMASI DOM: Gunakan string HTML tunggal, dilarang melooping "innerHTML +=" karena makan resource CPU tinggi.
+            let htmlRows = '';
+
+            dataToRender.forEach(item => {
                 const noSurat = item['Nomor Surat'] || '-';
                 const nopol = item['Nopol'] || '-';
                 const status = item['Status'] || 'Tersedia';
                 const statusClass = status.toLowerCase() === 'dipinjam' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
                 const editParam = encodeURIComponent(JSON.stringify({id: item.id, noSurat, nopol, status}));
 
-                tbody.innerHTML += `
+                htmlRows += `
                     <tr class="hover:bg-gray-50 transition border-b border-gray-100">
                         <td class="p-3 font-medium text-gray-800 text-xs">${noSurat}</td>
                         <td class="p-3 font-bold text-blue-600">${nopol}</td>
@@ -905,24 +905,38 @@
                     </tr>
                 `;
             });
+
+            // Memberikan notifikasi UI jika data melebihi 100
+            if (dbArsip.length > 100) {
+                htmlRows += `
+                    <tr>
+                        <td colspan="4" class="p-4 text-center text-xs text-gray-500 bg-gray-50">
+                            Menampilkan 100 data terbaru dari total <b class="text-blue-600">${dbArsip.length}</b> data.<br>
+                            Gunakan <b class="text-gray-700">Pencarian Arsip</b> untuk memanggil Nopol yang lebih lama.
+                        </td>
+                    </tr>`;
+            }
+
+            // Eksekusi DOM HANYA SEKALI
+            tbody.innerHTML = htmlRows;
         };
 
         window.renderTableBox = function() {
             const tbody = document.getElementById('tabel-data-box');
             if(!tbody) return;
-            tbody.innerHTML = '';
 
             if(dbBox.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">Belum ada data box.</td></tr>`;
                 return;
             }
 
+            let htmlRows = ''; // Gunakan string untuk mencegah lag
             dbBox.forEach(item => {
                 const namaBox = item['Nama Box'] || '-';
                 const rangeIsi = item['Range Isi'] || '-';
                 const editParam = encodeURIComponent(JSON.stringify({id: item.id, namaBox, rangeIsi}));
 
-                tbody.innerHTML += `
+                htmlRows += `
                     <tr class="hover:bg-gray-50 transition border-b border-gray-100">
                         <td class="p-3 font-medium text-gray-800 text-xs font-bold">${namaBox}</td>
                         <td class="p-3 text-xs text-gray-500">${rangeIsi}</td>
@@ -933,6 +947,8 @@
                     </tr>
                 `;
             });
+            
+            tbody.innerHTML = htmlRows; // Eksekusi DOM HANYA SEKALI
         };
 
         window.cariArsipDiDatabase = function() {
@@ -946,6 +962,7 @@
             window.showLoading(true, "Mencari Data...");
 
             setTimeout(() => {
+                // Pencarian via Memori JS selalu Super Cepat meskipun datanya berjuta-juta
                 let foundData = dbArsip.filter(item => (item['Nopol'] || '').toUpperCase().includes(searchKeyword));
                 
                 const container = document.getElementById('search-result-content');
@@ -956,7 +973,8 @@
                 if (foundData.length > 0) {
                     emptyState.classList.add('hidden');
                     tableContainer.classList.remove('hidden');
-                    container.innerHTML = '';
+                    
+                    let htmlRows = ''; // Gunakan string untuk mencegah lag
 
                     foundData.forEach(arsip => {
                         const noSurat = arsip['Nomor Surat'] || '-';
@@ -979,7 +997,7 @@
                         const statusClass = isDipinjam ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
                         const barClass = isDipinjam ? 'bg-amber-400' : 'bg-green-500';
 
-                        container.innerHTML += `
+                        htmlRows += `
                             <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden transition hover:shadow-md">
                                 <div class="absolute top-0 left-0 w-1.5 h-full ${barClass}"></div>
                                 <div class="flex justify-between items-start mb-3 pl-2">
@@ -1005,6 +1023,7 @@
                             </div>
                         `;
                     });
+                    container.innerHTML = htmlRows; // Render sekaligus
                 } else {
                     emptyState.classList.remove('hidden');
                     tableContainer.classList.add('hidden');
@@ -1175,8 +1194,6 @@
             });
         }
 
-        // --- PWA Service Worker Registration ---
-        // Script ini WAJIB ada di halaman HTML untuk mengaktifkan fitur PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').then(registration => {
@@ -1187,9 +1204,8 @@
             });
         }
 
-        // Init Aplikasi pada saat HTML dimuattt
         document.addEventListener("DOMContentLoaded", () => {
-            initFirebaseAuth(); // Inisialisasi Firebase Auth
+            initFirebaseAuth(); 
             setTimeout(() => {
                 const isLoggedIn = localStorage.getItem('isLoggedIn'), username = localStorage.getItem('username'), role = localStorage.getItem('role') || 'petugas';
                 if (isLoggedIn === 'true' && username) { updateUserUI(username, role); window.navigate('page-main'); } 
