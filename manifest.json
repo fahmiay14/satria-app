@@ -1,0 +1,21 @@
+{
+  "name": "Atos Pamor Arsip",
+  "short_name": "Atos Pamor",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10499b",
+  "description": "Aplikasi Manajemen Arsip Bapenda",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Wappen_der_Provinz_West-Java.png/512px-Wappen_der_Provinz_West-Java.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Wappen_der_Provinz_West-Java.png/512px-Wappen_der_Provinz_West-Java.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
