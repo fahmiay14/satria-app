@@ -277,7 +277,7 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- HALAMAN: DATA ARSIP (CRUD)                 -->
+        <!-- HALAMAN: DATA ARSIP (CRUD & IMPORT EXPORT) -->
         <!-- ========================================== -->
         <div id="page-data-arsip" class="page-container hidden h-full flex-col bg-gray-50 fade-in">
             <div class="bg-bapenda-blue text-white px-4 py-4 flex items-center gap-4 shadow-md pt-6 relative z-10 shrink-0">
@@ -288,10 +288,22 @@
             </div>
             
             <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
-                <div class="p-4 shrink-0">
+                <div class="p-4 shrink-0 space-y-3">
+                    <!-- Tombol Tambah Data -->
                     <button onclick="window.openArsipModal('add')" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-xl shadow-sm transition active:scale-95 flex justify-center items-center gap-2">
                         <span class="material-symbols-outlined">add_circle</span> Tambah Data Arsip
                     </button>
+                    <!-- Tombol Import & Export CSV -->
+                    <div class="flex gap-2">
+                        <button onclick="document.getElementById('csv-file-input').click()" class="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium py-2.5 rounded-xl shadow-sm transition active:scale-95 flex justify-center items-center gap-1.5 text-sm border border-blue-200">
+                            <span class="material-symbols-outlined text-[18px]">upload_file</span> Import CSV
+                        </button>
+                        <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="window.importCSV(event)">
+                        
+                        <button onclick="window.exportCSV()" class="flex-1 bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium py-2.5 rounded-xl shadow-sm transition active:scale-95 flex justify-center items-center gap-1.5 text-sm border border-gray-200">
+                            <span class="material-symbols-outlined text-[18px]">download</span> Export CSV
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="px-4 pb-8 flex-1 overflow-y-auto">
@@ -595,7 +607,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Menambahkan modul writeBatch untuk import massal yang aman ke database
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================
         // KONFIGURASI FIREBASE ANDA
@@ -761,6 +774,108 @@
             window.showLoading(false);
         };
 
+        // ===============================================
+        // FUNGSI IMPORT & EXPORT CSV (BARU)
+        // ===============================================
+        window.importCSV = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!firebaseUser) return window.showToast("Belum terhubung ke Database", "error");
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                // Memisahkan baris berdasarkan Enter (mendukung format Windows/Mac/Linux)
+                const rows = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
+                
+                if (rows.length < 2) return window.showToast("File CSV kosong atau tidak valid", "error");
+
+                window.showLoading(true, "Mengimpor Data...");
+                
+                try {
+                    let batch = writeBatch(db); // Menggunakan batch agar tidak limit Firebase
+                    let count = 0;
+                    let totalImported = 0;
+
+                    // Mulai dari i=1 untuk melewati baris header (Nomor Surat,Nopol,Status)
+                    for (let i = 1; i < rows.length; i++) {
+                        const cols = rows[i].split(',').map(col => col.replace(/(^"|"$)/g, '').trim());
+                        
+                        if (cols.length >= 2) { // Minimal ada No Surat dan Nopol
+                            const noSurat = cols[0];
+                            const nopol = cols[1].toUpperCase();
+                            const status = cols[2] || 'Tersedia'; // Default Tersedia jika kosong
+                            const id = "ARSIP-IMP-" + Date.now() + "-" + i;
+
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'arsip', id);
+                            batch.set(docRef, {
+                                "Nomor Surat": noSurat,
+                                "Nopol": nopol,
+                                "Status": status
+                            });
+                            
+                            count++;
+                            totalImported++;
+
+                            // Firebase batch max adalah 500 operasi, jadi kita commit setiap 500
+                            if (count === 500) {
+                                await batch.commit();
+                                batch = writeBatch(db);
+                                count = 0;
+                            }
+                        }
+                    }
+                    
+                    // Commit sisa data yang belum mencapai 500
+                    if (count > 0) {
+                        await batch.commit();
+                    }
+                    
+                    window.showToast(`${totalImported} data berhasil diimpor!`);
+                } catch(err) {
+                    console.error(err);
+                    window.showToast("Terjadi error saat mengimpor", "error");
+                }
+                
+                event.target.value = ''; // Reset input file
+                window.showLoading(false);
+            };
+            reader.readAsText(file);
+        };
+
+        window.exportCSV = function() {
+            if (dbArsip.length === 0) return window.showToast("Tidak ada data untuk diekspor", "error");
+            
+            // Membuat Header CSV
+            let csvContent = "Nomor Surat,Nopol,Status\n";
+            
+            // Memasukkan isi data
+            dbArsip.forEach(row => {
+                const noSurat = row['Nomor Surat'] || '';
+                const nopol = row['Nopol'] || '';
+                const status = row['Status'] || 'Tersedia';
+                csvContent += `"${noSurat}","${nopol}","${status}"\n`;
+            });
+            
+            // Proses Download File CSV di Browser
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Data_Arsip_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            window.showToast("Data sedang diunduh...");
+        };
+
+        // ===============================================
+        // RENDER UI & UTILITY (READ DATA)
+        // ===============================================
         window.renderTableArsip = function() {
             const tbody = document.getElementById('tabel-data-arsip');
             if(!tbody) return;
