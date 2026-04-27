@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Atos Pamor - Web Arsip (Firebase)</title>
+    
+    <!-- PWA Manifest & Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10499b">
+    
+    <!-- PWA Icons untuk memancing pop-up instalasi Chrome/Safari -->
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Wappen_der_Provinz_West-Java.png/192px-Wappen_der_Provinz_West-Java.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Wappen_der_Provinz_West-Java.png/192px-Wappen_der_Provinz_West-Java.png">
+    
     <!-- Tailwind CSS untuk Styling Cepat -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Material Icons -->
@@ -103,7 +112,7 @@
                 <div class="flex items-center justify-center gap-1 mb-2">
                     <span class="font-bold text-gray-500 text-xl tracking-tighter">bap<span class="text-gray-400">e</span>nda</span>
                 </div>
-                <p class="text-xs text-gray-400">Versi Aplikasi : 5.0.0 (Firebase)</p>
+                <p class="text-xs text-gray-400">Versi Aplikasi : 5.0.0 (Firebase PWA)</p>
             </div>
         </div>
 
@@ -593,11 +602,9 @@
         // =========================================================================
         let firebaseConfig;
         
-        // Agar tetap aman dan tidak error saat dipreview di sistem web kami, kita gunakan sistem fallback.
         if (typeof __firebase_config !== 'undefined') {
             firebaseConfig = JSON.parse(__firebase_config);
         } else {
-            // Ini adalah Config milik Anda yang akan dibaca saat web dihosting di tempat lain (contoh: GitHub Pages, Netlify)
             firebaseConfig = {
                 apiKey: "AIzaSyD44Pjk7UKcu08H3CEeSOoEXfHlxbm9lvM",
                 authDomain: "db-arsip-153a0.firebaseapp.com",
@@ -612,8 +619,6 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        // Default penamaan App ID untuk struktur database
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'AtosPamorApp';
 
         // Local State
@@ -623,9 +628,6 @@
         let unsubArsip = null;
         let unsubBox = null;
 
-        // ===============================================
-        // CUSTOM TOAST NOTIFICATION (Pengganti Alert)
-        // ===============================================
         window.showToast = function(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -644,15 +646,12 @@
             }, 3000);
         };
 
-        // ===============================================
-        // SISTEM AUTENTIKASI DATABASE
-        // ===============================================
         const initFirebaseAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth); // Autentikasi anonim di background
+                    await signInAnonymously(auth); 
                 }
             } catch (error) {
                 window.showToast("Gagal terhubung ke Database.", "error");
@@ -670,14 +669,10 @@
             }
         });
 
-        // ===============================================
-        // MENDENGARKAN PERUBAHAN DATA SECARA REAL-TIME
-        // ===============================================
         function setupRealtimeListeners() {
             if (!firebaseUser) return;
             window.showLoading(true, "Sinkronisasi Live...");
 
-            // Struktur path database disesuaikan dengan aturan sistem
             const arsipRef = collection(db, 'artifacts', appId, 'public', 'data', 'arsip');
             const boxRef = collection(db, 'artifacts', appId, 'public', 'data', 'box');
 
@@ -701,9 +696,6 @@
             });
         }
 
-        // ===============================================
-        // FUNGSI CRUD (CREATE, UPDATE, DELETE) FIREBASE
-        // ===============================================
         window.saveArsip = async function(e) {
             e.preventDefault();
             if (!firebaseUser) return window.showToast("Belum terhubung ke Database", "error");
@@ -769,9 +761,6 @@
             window.showLoading(false);
         };
 
-        // ===============================================
-        // RENDER UI & UTILITY (READ DATA)
-        // ===============================================
         window.renderTableArsip = function() {
             const tbody = document.getElementById('tabel-data-arsip');
             if(!tbody) return;
@@ -910,9 +899,6 @@
             }, 500); 
         };
 
-        // ===============================================
-        // PENGATURAN MODAL & UI GLOBAL LAINNYA
-        // ===============================================
         window.openArsipModal = function(mode, encodedData = null) {
             const title = document.getElementById('title-modal-arsip');
             const inputId = document.getElementById('arsip-id');
@@ -1026,7 +1012,6 @@
             else { p.type = 'password'; i.textContent = 'visibility_off'; i.classList.remove('text-bapenda-blue'); i.classList.add('text-gray-400'); }
         };
 
-        // Autentikasi UI Lokal 
         window.doLogin = function(event) {
             event.preventDefault(); 
             const username = document.getElementById('usernameInput').value.toUpperCase();
@@ -1072,6 +1057,18 @@
                         <div class="flex items-center gap-4"><div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-500"><span class="material-symbols-outlined">${m.icon}</span></div>
                         <div><h4 class="font-bold text-sm text-gray-800">${m.title}</h4><p class="text-xs text-gray-500 mt-1">${m.desc}</p></div></div><span class="material-symbols-outlined text-blue-600">chevron_right</span>
                     </div> ${i < menus.length - 1 ? '<hr class="border-gray-100">' : ''}`;
+            });
+        }
+
+        // --- PWA Service Worker Registration ---
+        // Script ini WAJIB ada di halaman HTML untuk mengaktifkan fitur PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful');
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
             });
         }
 
