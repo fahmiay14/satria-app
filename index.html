@@ -42,14 +42,15 @@
         #sidebar.open {
             transform: translateX(0);
         }
+        /* Perbaikan efek overlay sidebar */
         #sidebar-overlay {
             transition: opacity 0.3s ease-in-out;
             opacity: 0;
-            pointer-events: none;
+            pointer-events: none; /* Cegah klik saat tertutup */
         }
         #sidebar-overlay.open {
             opacity: 1;
-            pointer-events: auto;
+            pointer-events: auto; /* Bisa diklik saat terbuka */
         }
         .plat-input:focus {
             outline: none;
@@ -138,7 +139,7 @@
                 </div>
 
                 <div class="mb-6">
-                    <p class="text-gray-700 text-lg">Wilujeng Sumping</p>
+                    <p class="text-gray-700 text-lg">Selamat Datang ...</p>
                     <h2 class="text-xl font-bold text-black">di SATRIA Mobile</h2>
                 </div>
 
@@ -183,24 +184,16 @@
         <div id="page-main" class="page-container hidden h-full flex-col bg-gray-50 fade-in">
             <div class="bg-bapenda-blue text-white pt-6 pb-12 px-5 rounded-b-[2rem] shadow-md relative z-10 w-full">
                 <div class="flex items-center justify-between mb-6 mt-2">
-                    <div class="flex items-center gap-3">
-                        <button onclick="window.toggleSidebar()" class="p-1 hover:bg-white/10 rounded-full transition">
-                            <span class="material-symbols-outlined text-3xl">menu</span>
-                        </button>
-                        <div class="flex items-center gap-2 bg-white rounded-full p-1 pr-3 shadow-sm" id="live-sync-indicator">
-                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <!-- Animasi spin subtle untuk sync background -->
-                                <span class="material-symbols-outlined text-bapenda-blue text-sm animate-[spin_3s_linear_infinite]">sync</span>
-                            </div>
-                            <span class="text-bapenda-blue font-semibold text-sm">Live Sync</span>
-                        </div>
-                    </div>
+                    <button onclick="window.toggleSidebar()" class="p-1 hover:bg-white/10 rounded-full transition flex items-center justify-center">
+                        <span class="material-symbols-outlined text-3xl">menu</span>
+                    </button>
+                    <!-- Indikator live sync di-remove dari sini dan dipindah ke footer progress bar -->
                 </div>
 
                 <div>
                     <h2 class="text-lg font-bold mb-1">Wilujeng Sumping, <span id="displayNamaUser">PENGGUNA</span> 👋</h2>
                     <p class="text-sm text-blue-100">Selamat Bekerja</p>
-                    <p class="text-xs text-blue-200 mt-2">Versi Aplikasi: 5.0.0 (Firebase)</p>
+                    <p class="text-xs text-blue-200 mt-2">Versi Aplikasi: 2.0.0 (Firebase)</p>
                 </div>
             </div>
 
@@ -463,8 +456,8 @@
         <!-- ========================================== -->
         <!-- SIDEBAR OVERLAY & MENU                     -->
         <!-- ========================================== -->
-        <!-- Ditambahkan class backdrop-blur-sm agar background menjadi blur saat menu terbuka -->
-        <div id="sidebar-overlay" onclick="window.toggleSidebar()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40 hidden transition-opacity duration-300"></div>
+        <!-- Dihapus class 'hidden' karena CSS sudah menangani opacity dan click events nya -->
+        <div id="sidebar-overlay" onclick="window.toggleSidebar()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"></div>
 
         <div id="sidebar" class="absolute top-0 left-0 h-full w-4/5 bg-white z-50 flex flex-col shadow-2xl rounded-r-3xl">
             <div class="bg-bapenda-blue text-white p-6 rounded-tr-3xl pb-8 pt-8">
@@ -600,6 +593,19 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- FOOTER PROGRESS BAR SINKRONISASI LIVE      -->
+        <!-- ========================================== -->
+        <div id="sync-footer" class="absolute bottom-0 left-0 w-full bg-white border-t border-gray-200 z-[45] flex flex-col transition-transform duration-500 transform translate-y-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div class="h-1.5 w-full bg-gray-100 overflow-hidden">
+                <div id="sync-progress-bar" class="h-full bg-blue-500 transition-all duration-500 ease-out" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between items-center px-4 py-2">
+                <span id="sync-status-text" class="text-[11px] font-bold text-blue-600">Menyinkronkan data...</span>
+                <span id="sync-status-icon" class="material-symbols-outlined text-[16px] text-blue-500 animate-spin">sync</span>
+            </div>
+        </div>
+
     </div>
 
     <!-- =============================================== -->
@@ -645,6 +651,45 @@
         // Paginasi State (Infinite Scroll)
         window.arsipRenderLimit = 100;
 
+        // ===============================================
+        // FUNGSI FOOTER PROGRESS BAR
+        // ===============================================
+        let syncTimeoutId;
+        window.triggerSyncProgress = function() {
+            const footer = document.getElementById('sync-footer');
+            const bar = document.getElementById('sync-progress-bar');
+            const text = document.getElementById('sync-status-text');
+            const icon = document.getElementById('sync-status-icon');
+
+            clearTimeout(syncTimeoutId);
+
+            // Munculkan footer dengan status biru (loading)
+            footer.classList.remove('translate-y-full');
+            bar.style.width = '40%';
+            bar.className = 'h-full bg-blue-500 transition-all duration-500 ease-out';
+            text.textContent = 'Menyinkronkan data pembaruan...';
+            text.className = 'text-[11px] font-bold text-blue-600';
+            icon.textContent = 'sync';
+            icon.className = 'material-symbols-outlined text-[16px] text-blue-500 animate-spin';
+
+            // Selesaikan animasi (warna hijau) karena Firebase onSnapshot sangat cepat
+            setTimeout(() => {
+                bar.style.width = '100%';
+                bar.className = 'h-full bg-green-500 transition-all duration-500 ease-out';
+                text.textContent = 'Sinkronisasi Selesai (Data Terkini)';
+                text.className = 'text-[11px] font-bold text-green-600';
+                icon.textContent = 'cloud_done';
+                icon.className = 'material-symbols-outlined text-[16px] text-green-500';
+
+                // Turunkan/Sembunyikan footer setelah selesai
+                syncTimeoutId = setTimeout(() => {
+                    footer.classList.add('translate-y-full');
+                    // Reset lebar bar setelah disembunyikan
+                    setTimeout(() => { bar.style.width = '0%'; }, 500); 
+                }, 2500);
+            }, 600); // Simulasi waktu tarik data untuk UI
+        };
+
         window.showToast = function(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -688,8 +733,6 @@
 
         function setupRealtimeListeners() {
             if (!firebaseUser) return;
-            // Mematikan loading agar Sinkronisasi berjalan secara "Siluman" di background tanpa mengganggu user
-            // window.showLoading(true, "Sinkronisasi Live...");
 
             const arsipRef = collection(db, 'artifacts', appId, 'public', 'data', 'arsip');
             const boxRef = collection(db, 'artifacts', appId, 'public', 'data', 'box');
@@ -700,6 +743,9 @@
                 // Sort Descending by ID to get newest first
                 dbArsip.sort((a, b) => b.id.localeCompare(a.id));
                 window.renderTableArsip();
+                
+                // Trigger Progress Bar di Footer setiap kali data arsip diubah/dimuat
+                window.triggerSyncProgress();
             }, (error) => {
                 window.showToast("Gagal memuat Arsip: " + error.message, "error");
             });
@@ -708,6 +754,9 @@
                 dbBox = [];
                 snapshot.forEach(doc => dbBox.push({ id: doc.id, ...doc.data() }));
                 window.renderTableBox();
+                
+                // Trigger Progress Bar jika ada penambahan box
+                window.triggerSyncProgress();
             }, (error) => {
                 window.showToast("Gagal memuat Box: " + error.message, "error");
             });
@@ -1159,7 +1208,13 @@
         };
 
         window.moveToNext = (current, nextFieldId) => { if (current.value.length >= current.maxLength) document.getElementById(nextFieldId).focus(); };
-        window.toggleSidebar = () => { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebar-overlay').classList.toggle('hidden'); };
+        
+        // Perbaikan Fungsi toggleSidebar agar berinteraksi benar dengan CSS pointer-events
+        window.toggleSidebar = () => { 
+            document.getElementById('sidebar').classList.toggle('open'); 
+            document.getElementById('sidebar-overlay').classList.toggle('open'); 
+        };
+        
         window.togglePassword = () => {
             const p = document.getElementById('passwordInput'), i = document.getElementById('togglePasswordIcon');
             if (p.type === 'password') { p.type = 'text'; i.textContent = 'visibility'; i.classList.add('text-bapenda-blue'); i.classList.remove('text-gray-400'); }
@@ -1175,7 +1230,7 @@
         };
         window.doLogout = function() {
             localStorage.clear(); document.getElementById('loginForm').reset();
-            document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.add('hidden');
+            document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open');
             window.navigate('page-login');
         };
         function updateUserUI(name, role) {
