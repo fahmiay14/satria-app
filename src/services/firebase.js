@@ -2,13 +2,14 @@ import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously } from 'firebase/auth' // <-- Tambahkan signInAnonymously
 import { getFirestore } from 'firebase/firestore'
 
+
 const firebaseConfig = {
-  apiKey: 'AIzaSyD44Pjk7UKcu08H3CEeSOoEXfHlxbm9lvM',
-  authDomain: 'db-arsip-153a0.firebaseapp.com',
-  projectId: 'db-arsip-153a0',
-  storageBucket: 'db-arsip-153a0.firebasestorage.app',
-  messagingSenderId: '1038523807909',
-  appId: '1:1038523807909:web:80b536fab08d1ca6a3754c'
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 }
 
 const app = initializeApp(firebaseConfig)
