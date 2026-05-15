@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">satria-apps</string>
+    <string name="title_activity_main">satria-apps</string>
+    <string name="package_name">com.satria.app</string>
+    <string name="custom_url_scheme">com.satria.app</string>
+</resources>
