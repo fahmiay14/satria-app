@@ -15,6 +15,7 @@ import PerencanaanPribadiView from '../views/PerencanaanPribadiView.vue'
 import PerencanaanPerusahaanView from '../views/PerencanaanPerusahaanView.vue'
 import RuteTercepatView from '../views/RuteTercepatView.vue'
 import TandaiLokasiView from '../views/TandaiLokasiView.vue'
+import ManagementUserView from '../views/ManagementUserView.vue'
 
 const routes = [
   { path: '/', component: SplashView },
@@ -31,7 +32,8 @@ const routes = [
   { path: '/rute/perencanaan-perusahaan', component: PerencanaanPerusahaanView},
   { path: '/rute/tercepat', component: RuteTercepatView},
   { path: '/rute/tandai', component: TandaiLokasiView},
-  { path: '/search-arsip', component: SearchView }
+  { path: '/search-arsip', component: SearchView },
+  { path: '/management-user', component: ManagementUserView }
 ]
 
 const router = createRouter({

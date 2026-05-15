@@ -127,11 +127,14 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth' // Memasukkan Store Auth
 
 const router = useRouter()
+const authStore = useAuthStore()
 const sidebarOpen = ref(false)
 
-const username = localStorage.getItem('username') || 'PENGGUNA'
+// Kita memanggil 'nama' yang diset di LocalStorage
+const username = localStorage.getItem('nama') || 'PENGGUNA'
 const role = localStorage.getItem('role') || 'petugas'
 
 const roleLabel = computed(() =>
@@ -170,7 +173,7 @@ function goTo(path) {
 }
 
 function logout() {
-  localStorage.clear()
+  authStore.logout() // Panggil dari Auth Store
   router.push('/login')
 }
 </script>

@@ -1,107 +1,187 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
 import { db } from '../services/firebase'
-import { collection, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, query, where, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore'
 
-export const useRuteStore = defineStore('rute', () => {
-  // Path Koleksi Firebase
-  const lokasiPath = ['artifacts', 'SatriaApp', 'public', 'data', 'rute_lokasi']
-  const petugasPath = ['artifacts', 'SatriaApp', 'public', 'data', 'rute_petugas']
-  // Kita gabungkan saja penyimpanan tandai ke lokasiPath agar bisa muncul di Data Rute!
-  // const tandaiPath = ['artifacts', 'SatriaApp', 'public', 'data', 'rute_tandai']
+export const useRuteStore = defineStore('rute', {
+  state: () => ({
+    lokasiList: [],
+    petugasList: [], // Akan diisi dari tabel users_account
+    loading: false
+  }),
 
-  // State
-  const lokasiList = ref([]) // Data Perusahaan / Rute / Pribadi
-  const petugasList = ref([]) // Data Petugas
-  const loading = ref(false)
+  actions: {
+    // Helper: Buat ID String Acak (Contoh: RUTE-xY9zQ1wE4rTy)
+    generateId(prefix) {
+      const randomStr = Math.random().toString(36).substring(2, 14).toUpperCase()
+      return `${prefix}-${randomStr}`
+    },
 
-  // =========================
-  // CRUD LOKASI (PERUSAHAAN / PRIBADI)
-  // =========================
-  async function loadLokasi() {
-    loading.value = true
-    try {
-      const snapshot = await getDocs(collection(db, ...lokasiPath))
-      // Pastikan kategori di-load, jika tidak ada default ke Perusahaan
-      lokasiList.value = snapshot.docs.map(docu => ({
-        id: docu.id,
-        nama: docu.data().nama,
-        lat: docu.data().lat,
-        lng: docu.data().lng,
-        petugas: docu.data().petugas,
-        kategori: docu.data().kategori || 'Perusahaan'
-      }))
-    } catch (error) {
-      console.error('LOAD LOKASI ERROR:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+    // 1. Load Data Petugas (Dari tabel users_account yang rolenya 'petugas')
+    async loadPetugas() {
+      this.loading = true
+      try {
+        // PERBAIKAN PATH: Menambahkan 'data' agar menjadi 5 bagian (valid untuk collection)
+        const usersPath = ['artifacts', 'SatriaApp', 'public', 'data', 'users_account']
+        const q = query(
+          collection(db, ...usersPath),
+          where('role', '==', 'petugas')
+        )
+        const snapshot = await getDocs(q)
 
-  async function saveLokasi(data) {
-    loading.value = true
-    try {
-      const payload = {
-        nama: data.nama,
-        lat: parseFloat(data.lat),
-        lng: parseFloat(data.lng),
-        petugas: data.petugas || '',
-        kategori: data.kategori || 'Perusahaan' // Simpan kategori dari parameter data
+        this.petugasList = snapshot.docs.map(doc => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            nama: data.nama,
+            username: data.username,
+            // Beri warna acak atau statis untuk marker di peta
+            warna: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
+          }
+        })
+      } catch (error) {
+        console.error("Gagal memuat daftar petugas:", error)
+      } finally {
+        this.loading = false
       }
-      const docId = data.id ? data.id.toString() : `LOC-${Date.now()}`
-      await setDoc(doc(db, ...lokasiPath, docId), payload)
-      await loadLokasi()
-    } catch (error) {
-      console.error('SAVE LOKASI ERROR:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+    },
 
-  async function deleteLokasi(id) {
-    loading.value = true
-    try {
-      await deleteDoc(doc(db, ...lokasiPath, id))
-      await loadLokasi()
-    } catch (error) {
-      console.error('DELETE LOKASI ERROR:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+    // 2. Load Lokasi Rute berdasarkan Aturan Hak Akses (Privasi)
+    async loadLokasi() {
+      this.loading = true
+      this.lokasiList = []
 
-  // =========================
-  // CRUD PETUGAS
-  // =========================
-  async function loadPetugas() {
-    loading.value = true
-    try {
-      const snapshot = await getDocs(collection(db, ...petugasPath))
-      petugasList.value = snapshot.docs.map(docu => ({ id: docu.id, ...docu.data() }))
-    } catch (error) {
-      console.error('LOAD PETUGAS ERROR:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+      const currentUserId = localStorage.getItem('userId')
 
-  async function savePetugas(data) {
-    loading.value = true
-    try {
-      const payload = { nama: data.nama, warna: data.warna || '#0066cc' }
-      const docId = data.id ? data.id.toString() : `PTG-${Date.now()}`
-      await setDoc(doc(db, ...petugasPath, docId), payload)
-      await loadPetugas()
-    } catch (error) {
-      console.error('SAVE PETUGAS ERROR:', error)
-    } finally {
-      loading.value = false
-    }
-  }
+      // PERBAIKAN PATH: Menambahkan 'data' agar menjadi 5 bagian
+      const rutePath = ['artifacts', 'SatriaApp', 'public', 'data', 'data_rute']
 
-  return {
-    lokasiList, petugasList, loading,
-    loadLokasi, saveLokasi, deleteLokasi,
-    loadPetugas, savePetugas
+      try {
+        let perusahaanQuery;
+        let pribadiQuery;
+
+        // QUERY 1: Ambil data Perusahaan
+        // REVISI: Semua role (Admin/Petugas) melihat SEMUA rute perusahaan karena sifatnya publik
+        perusahaanQuery = query(
+          collection(db, ...rutePath),
+          where('kategori', '==', 'Perusahaan')
+        )
+
+        // QUERY 2: Ambil data Pribadi
+        // REVISI: Semua role (Admin/Petugas) HANYA melihat rute pribadi miliknya sendiri
+        pribadiQuery = query(
+          collection(db, ...rutePath),
+          where('kategori', '==', 'Pribadi'),
+          where('id_user_petugas', '==', currentUserId) // Untuk rute pribadi, pembuat kita catat di id_user_petugas
+        )
+
+        // Eksekusi kedua Query secara paralel
+        const [perusahaanSnap, pribadiSnap] = await Promise.all([
+          getDocs(perusahaanQuery),
+          getDocs(pribadiQuery)
+        ])
+
+        // Gabungkan hasilnya
+        const allDocs = []
+        perusahaanSnap.forEach(doc => allDocs.push({ id_rute: doc.id, ...doc.data() }))
+        pribadiSnap.forEach(doc => allDocs.push({ id_rute: doc.id, ...doc.data() }))
+
+        this.lokasiList = allDocs
+
+      } catch (error) {
+        console.error("Gagal memuat lokasi:", error)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 3. Simpan Lokasi (Create & Update)
+    async saveLokasi(lokasiData) {
+      this.loading = true
+      const currentUserId = localStorage.getItem('userId')
+      const currentUserName = localStorage.getItem('username')
+
+      // PERBAIKAN PATH: Menambahkan 'data' agar menjadi 5 bagian
+      const rutePath = ['artifacts', 'SatriaApp', 'public', 'data', 'data_rute']
+
+      try {
+        const isNew = !lokasiData.id_rute
+        const docId = isNew ? this.generateId('RUTE') : lokasiData.id_rute
+
+        let payload = {
+          nama: lokasiData.nama, // Di class diagram nama_lokasi, disesuaikan ke komponen vue anda
+          lat: parseFloat(lokasiData.lat),
+          lng: parseFloat(lokasiData.lng),
+          kategori: lokasiData.kategori || 'Perusahaan',
+          updated_at: new Date().toISOString()
+        }
+
+        if (isNew) {
+          payload.created_at = new Date().toISOString()
+
+          if (payload.kategori === 'Pribadi') {
+            // RUTE PRIBADI: Admin dikosongkan, Petugas diisi dengan pembuat
+            payload.id_user_admin = ""
+            payload.nama_admin = ""
+            payload.id_user_petugas = currentUserId
+            payload.nama_petugas = currentUserName // Agar nama pembuat tampil di peta
+            // Kita juga simpan field 'petugas' (nama saja) agar kompatibel dengan kode Map Anda yang lama
+            payload.petugas = currentUserName
+          } else {
+            // RUTE PERUSAHAAN (Biasanya Admin yang buat)
+            payload.id_user_admin = currentUserId
+            payload.nama_admin = currentUserName
+            payload.id_user_petugas = lokasiData.id_user_petugas || ""
+            payload.nama_petugas = lokasiData.nama_petugas || ""
+            payload.petugas = lokasiData.petugas || "" // Untuk dropdown
+          }
+        } else {
+          // UPDATE RUTE (Hanya update data penugasan atau nama/lat/lng)
+          if (lokasiData.petugas) {
+            payload.petugas = lokasiData.petugas
+            // Cari ID petugas berdasarkan nama dari petugasList
+            const p = this.petugasList.find(x => x.nama === lokasiData.petugas)
+            if (p) {
+              payload.id_user_petugas = p.id
+              payload.nama_petugas = p.nama
+            } else {
+              payload.id_user_petugas = ""
+              payload.nama_petugas = ""
+            }
+          } else {
+            payload.petugas = ""
+            payload.id_user_petugas = ""
+            payload.nama_petugas = ""
+          }
+        }
+
+        // Simpan ke Firestore
+        await setDoc(doc(db, ...rutePath, docId), payload, { merge: true })
+
+        // Refresh data
+        await this.loadLokasi()
+
+      } catch (error) {
+        console.error("Gagal menyimpan lokasi:", error)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 4. Hapus Lokasi
+    async deleteLokasi(id_rute) {
+      this.loading = true
+
+      // PERBAIKAN PATH: Menambahkan 'data' agar menjadi 5 bagian
+      const rutePath = ['artifacts', 'SatriaApp', 'public', 'data', 'data_rute']
+
+      try {
+        await deleteDoc(doc(db, ...rutePath, id_rute))
+        await this.loadLokasi()
+      } catch (error) {
+        console.error("Gagal menghapus lokasi:", error)
+      } finally {
+        this.loading = false
+      }
+    }
   }
 })
