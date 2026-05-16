@@ -1,10 +1,11 @@
 <template>
-  <div class="h-screen flex flex-col bg-gray-50 overflow-hidden relative">
+  <div class="h-[100dvh] flex flex-col bg-gray-50 overflow-hidden relative">
+
     <!-- Header -->
     <div class="bg-[#10499b] text-white pt-6 pb-12 px-5 rounded-b-[2rem] shadow-md relative z-10 w-full">
       <div class="flex items-center justify-between mb-6 mt-2">
         <button
-          @click="toggleSidebar"
+          @click="sidebarOpen = true"
           class="p-1 hover:bg-white/10 rounded-full transition flex items-center justify-center"
         >
           <span class="material-symbols-outlined text-3xl">menu</span>
@@ -58,82 +59,19 @@
       </div>
     </div>
 
-    <!-- Overlay -->
-    <div
-      v-if="sidebarOpen"
-      @click="toggleSidebar"
-      class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"
-    ></div>
-
-    <!-- Sidebar -->
-    <div
-      class="absolute top-0 left-0 h-full w-4/5 bg-white z-50 flex flex-col shadow-2xl rounded-r-3xl transition-transform duration-300"
-      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-    >
-      <!-- Header Sidebar -->
-      <div class="bg-[#10499b] text-white p-6 rounded-tr-3xl pb-8 pt-8">
-        <div class="w-20 h-20 bg-gray-200 rounded-full border-4 border-white shadow-md overflow-hidden mb-4 flex items-center justify-center">
-          <span class="material-symbols-outlined text-5xl text-blue-500">person</span>
-        </div>
-
-        <h2 class="text-lg font-bold mb-1">{{ username }}</h2>
-
-        <div class="text-xs text-blue-100 space-y-1">
-          <p>
-            Status: <span class="text-green-300 font-bold">Online</span>
-          </p>
-          <p class="font-medium text-white mt-1">{{ roleLabel }}</p>
-        </div>
-      </div>
-
-      <!-- Menu Sidebar -->
-      <div class="flex-1 py-4">
-        <!-- Manajemen Pengguna di Sidebar (Hanya Admin) -->
-        <div
-          v-if="role === 'admin'"
-          @click="goTo('/management-user')"
-          class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition border-l-4 border-transparent hover:border-blue-500"
-        >
-          <div class="flex items-center gap-4">
-            <span class="material-symbols-outlined text-amber-500">admin_panel_settings</span>
-            <span class="text-gray-700 font-medium">Manajemen Pengguna</span>
-          </div>
-          <span class="material-symbols-outlined text-gray-400">chevron_right</span>
-        </div>
-
-        <div class="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition">
-          <div class="flex items-center gap-4">
-            <span class="material-symbols-outlined text-blue-500">manage_accounts</span>
-            <span class="text-gray-700 font-medium">Profil</span>
-          </div>
-          <span class="material-symbols-outlined text-gray-400">chevron_right</span>
-        </div>
-      </div>
-
-      <!-- Logout -->
-      <div class="p-6 border-t border-gray-100">
-        <button
-          @click="logout"
-          class="w-full flex items-center gap-4 hover:bg-red-50 p-3 rounded-xl transition"
-        >
-          <span class="material-symbols-outlined text-red-500">logout</span>
-          <span class="text-red-500 font-medium">Keluar</span>
-        </button>
-      </div>
-    </div>
+    <!-- MEMANGGIL KOMPONEN SIDEBAR -->
+    <AppSidebar v-model="sidebarOpen" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth' // Memasukkan Store Auth
+import AppSidebar from '../components/AppSidebar.vue'
 
 const router = useRouter()
-const authStore = useAuthStore()
 const sidebarOpen = ref(false)
 
-// Kita memanggil 'nama' yang diset di LocalStorage
 const username = localStorage.getItem('nama') || 'PENGGUNA'
 const role = localStorage.getItem('role') || 'petugas'
 
@@ -141,7 +79,7 @@ const roleLabel = computed(() =>
   role === 'admin' ? 'Administrator' : 'Petugas Penelusur'
 )
 
-// === KONFIGURASI MENU DINAMIS ===
+// === KONFIGURASI MENU DINAMIS (DASHBOARD) ===
 const menuConfig = {
   admin: [
     { title: 'Manajemen Pengguna', desc: 'Atur akun petugas dan admin', icon: 'admin_panel_settings', path: '/management-user', bgColor: 'bg-red-50', textColor: 'text-red-500' },
@@ -153,27 +91,16 @@ const menuConfig = {
   ],
   petugas: [
     { title: 'Menu Jadwal', desc: 'Lihat jadwal penugasan harian', icon: 'calendar_month', path: '/jadwal', bgColor: 'bg-green-50', textColor: 'text-green-500' },
-    { title: 'Menu Arsip', desc: 'Pencarian arsip lapangan', icon: 'folder_open', path: '/arsip-menu', bgColor: 'bg-blue-50', textColor: 'text-blue-500' },
+    // Menu Arsip Dihapus dari Petugas
     { title: 'Pengumuman', desc: 'Informasi dari pusat', icon: 'campaign', path: '/pengumuman', bgColor: 'bg-yellow-50', textColor: 'text-yellow-500' },
     { title: 'Optimasi Rute', desc: 'Panduan rute penelusuran', icon: 'route', path: '/rute', bgColor: 'bg-purple-50', textColor: 'text-purple-500' },
     { title: 'Laporan', desc: 'Laporan hasil di lapangan', icon: 'analytics', path: '/laporan', bgColor: 'bg-orange-50', textColor: 'text-orange-500' }
   ]
 }
 
-// Menentukan menu mana yang dirender berdasarkan role user
 const activeMenus = computed(() => menuConfig[role] || menuConfig['petugas'])
 
-function toggleSidebar() {
-  sidebarOpen.value = !sidebarOpen.value
-}
-
 function goTo(path) {
-  sidebarOpen.value = false // Tutup sidebar otomatis saat menu diklik
   router.push(path)
-}
-
-function logout() {
-  authStore.logout() // Panggil dari Auth Store
-  router.push('/login')
 }
 </script>

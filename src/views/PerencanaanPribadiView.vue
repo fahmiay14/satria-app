@@ -11,11 +11,8 @@
         <h1 class="text-lg font-medium">Perencanaan Pribadi</h1>
       </div>
 
-      <!-- Tombol Aksi Kanan -->
+      <!-- Tombol Aksi Kanan (Fitur Tambah Petugas Dihilangkan) -->
       <div class="flex gap-2">
-        <button @click="showPetugasModal = true" class="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition text-xs font-bold flex items-center gap-1">
-          <span class="material-symbols-outlined text-[16px]">badge</span> Petugas
-        </button>
         <button @click="bukaLaporan" class="p-1.5 bg-teal-500 hover:bg-teal-400 rounded-lg transition text-xs font-bold flex items-center gap-1">
           <span class="material-symbols-outlined text-[16px]">print</span> Laporan
         </button>
@@ -59,35 +56,6 @@
             <option value="">-- Belum Ditugaskan --</option>
             <option v-for="p in store.petugasList" :key="p.id" :value="p.nama">{{ p.nama }}</option>
           </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL MASTER PETUGAS -->
-    <div v-if="showPetugasModal" class="absolute inset-0 z-[600] bg-black/60 flex flex-col justify-center items-center p-4">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden animate-slide-up">
-        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
-          <h3 class="font-bold text-gray-800">Master Data Petugas</h3>
-          <button @click="showPetugasModal = false" class="text-gray-400 hover:text-red-500"><span class="material-symbols-outlined">close</span></button>
-        </div>
-
-        <div class="p-4 bg-white border-b border-gray-100">
-          <form @submit.prevent="tambahPetugas" class="flex gap-2">
-            <input v-model="formPetugas.nama" type="text" required placeholder="Nama Petugas" class="flex-1 border border-gray-300 p-2.5 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500">
-            <input v-model="formPetugas.warna" type="color" class="h-[42px] w-12 border border-gray-300 rounded-lg cursor-pointer p-0.5">
-            <button type="submit" class="bg-green-700 text-white px-4 rounded-lg text-sm font-bold active:scale-95 transition">Tambah</button>
-          </form>
-        </div>
-
-        <div class="p-4 flex-1 overflow-y-auto max-h-[40vh] bg-gray-50 space-y-2">
-          <div v-if="store.petugasList.length === 0" class="text-center text-sm text-gray-400 py-4">Belum ada data petugas.</div>
-          <div v-for="p in store.petugasList" :key="p.id" class="flex justify-between items-center p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
-            <div class="flex items-center">
-              <div class="w-4 h-4 rounded-full mr-3 shadow-inner" :style="{ backgroundColor: p.warna }"></div>
-              <span class="text-sm font-semibold text-gray-700">{{ p.nama }}</span>
-            </div>
-            <button @click="hapusPetugas(p)" class="text-[10px] uppercase font-bold text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition">Hapus</button>
-          </div>
         </div>
       </div>
     </div>
@@ -186,11 +154,8 @@ let map = null
 let markersGroup = null
 
 const selectedLokasi = ref(null)
-const showPetugasModal = ref(false)
 const showLaporanModal = ref(false)
 const reportData = ref(null)
-
-const formPetugas = ref({ nama: '', warna: '#14db22' })
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -264,22 +229,6 @@ function renderMarkers() {
 
 async function updatePetugas(lokasi) {
   await store.saveLokasi(lokasi)
-}
-
-async function tambahPetugas() {
-  if(!formPetugas.value.nama) return
-  await store.savePetugas(formPetugas.value)
-  formPetugas.value = { nama: '', warna: '#14db22' }
-}
-
-async function hapusPetugas(p) {
-  if(confirm(`Hapus petugas ${p.nama}? Lokasi yang diassign ke dia akan menjadi kosong.`)) {
-    const affected = store.lokasiList.filter(l => l.petugas === p.nama)
-    for(let loc of affected) {
-      await store.saveLokasi({ ...loc, petugas: '' })
-    }
-    alert('Hapus petugas via Firebase akan diimplementasikan penuh. Untuk sementara data ter-update.')
-  }
 }
 
 function siapkanDataLaporan() {

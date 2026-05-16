@@ -46,7 +46,8 @@
           <span>Total {{ activeTab }}: <span class="text-blue-600">{{ filteredLokasi.length }}</span></span>
         </div>
 
-        <div class="flex gap-2">
+        <!-- Disembunyikan khusus untuk role Petugas -->
+        <div v-if="role === 'admin'" class="flex gap-2">
           <!-- Input File Tersembunyi untuk Import -->
           <input type="file" ref="fileInput" @change="handleImportCSV" accept=".csv" class="hidden" />
 
@@ -73,7 +74,7 @@
       <div v-else-if="filteredLokasi.length === 0" class="bg-white border border-dashed border-gray-300 rounded-2xl p-8 text-center mt-4">
         <span class="material-symbols-outlined text-4xl text-gray-300 mb-2">location_off</span>
         <p class="text-gray-500 font-medium text-sm">Tidak ada data rute {{ activeTab }}</p>
-        <p class="text-gray-400 text-xs mt-1">Gunakan tombol + untuk menambahkan lokasi.</p>
+        <p v-if="role === 'admin'" class="text-gray-400 text-xs mt-1">Gunakan tombol + untuk menambahkan lokasi.</p>
       </div>
 
       <div v-else class="space-y-3">
@@ -98,8 +99,8 @@
               </div>
             </div>
 
-            <!-- Tombol Aksi (Edit & Hapus) -->
-            <div class="flex flex-col gap-1.5 shrink-0">
+            <!-- Tombol Aksi (Edit & Hapus) Disembunyikan khusus untuk role Petugas -->
+            <div v-if="role === 'admin'" class="flex flex-col gap-1.5 shrink-0">
               <button @click="openEdit(item)" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition active:scale-95">
                 <span class="material-symbols-outlined text-[16px]">edit</span>
               </button>
@@ -112,8 +113,9 @@
       </div>
     </div>
 
-    <!-- FAB (Floating Action Button) Tambah -->
+    <!-- FAB (Floating Action Button) Tambah (Hanya Admin) -->
     <button
+      v-if="role === 'admin'"
       @click="openTambah"
       class="absolute bottom-6 right-6 w-14 h-14 bg-[#10499b] hover:bg-blue-800 text-white rounded-full shadow-lg flex items-center justify-center transition active:scale-90 z-30"
     >
@@ -181,6 +183,7 @@ import { useRuteStore } from '../stores/rute'
 
 const router = useRouter()
 const store = useRuteStore()
+const role = localStorage.getItem('role') || 'petugas'
 
 // State
 const activeTab = ref('Perusahaan') // Default Tab
