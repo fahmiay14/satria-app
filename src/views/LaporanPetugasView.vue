@@ -222,7 +222,7 @@
               <button type="submit" :disabled="isLoadingGPS || !formData.perusahaan || !formData.status" class="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 text-sm flex justify-center items-center gap-2">
                 <span v-if="isLoadingGPS" class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                 <span v-else class="material-symbols-outlined text-[18px]">satellite_alt</span>
-                {{ isLoadingGPS ? 'Mengambil Kordinat GPS...' : 'Kirim Laporan (Auto GPS)' }}
+                {{ isLoadingGPS ? 'Mencari Kordinat GPS...' : 'Kirim Laporan (Auto GPS)' }}
               </button>
             </div>
           </form>
@@ -238,6 +238,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLaporanStore } from '../stores/laporan'
 import { useRuteStore } from '../stores/rute'
+import { Geolocation } from '@capacitor/geolocation' // IMPORT PLUGIN NATIVE CAPACITOR
 
 const router = useRouter()
 const laporanStore = useLaporanStore()
@@ -349,7 +350,7 @@ const adminSummaryStats = computed(() => {
   })
 })
 
-// === LOGIKA MODAL & SUBMIT LAPORAN (HANYA PETUGAS) ===
+// === LOGIKA MODAL & SUBMIT LAPORAN DENGAN CAPACITOR GEOLOCATION ===
 const showModal = ref(false)
 const isLoadingGPS = ref(false)
 const formData = ref({
@@ -358,48 +359,64 @@ const formData = ref({
   catatan: ''
 })
 
-function kirimLaporan() {
-  if (!navigator.geolocation) {
-    alert("Browser/HP Anda tidak mendukung GPS.")
-    return
+async function prosesPengirimanLaporan(lat, lng) {
+  const payload = {
+    perusahaan: formData.value.perusahaan,
+    status: formData.value.status,
+    catatan: formData.value.catatan,
+    petugas: currentUser,
+    date: selectedDate.value,
+    lat: lat,
+    lng: lng
   }
 
+  await laporanStore.saveLaporan(payload)
+
+  window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Laporan dan Lokasi berhasil dikirim!', type: 'success' } }))
+
+  isLoadingGPS.value = false
+  showModal.value = false
+
+  // Reset form
+  formData.value = { perusahaan: '', status: 'Telah Dikunjungi', catatan: '' }
+}
+
+async function kirimLaporan() {
   isLoadingGPS.value = true
 
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      // 1. Success Callback (Lokasi Berhasil Didapat)
-      const lat = position.coords.latitude
-      const lng = position.coords.longitude
-
-      const payload = {
-        perusahaan: formData.value.perusahaan,
-        status: formData.value.status,
-        catatan: formData.value.catatan,
-        petugas: currentUser,
-        date: selectedDate.value, // Menyimpan referensi tanggal laporan dibuat
-        lat: lat,
-        lng: lng
+  try {
+    // 1. Cek & Minta Izin Lokasi di Android
+    const checkPerm = await Geolocation.checkPermissions()
+    if (checkPerm.location !== 'granted') {
+      const requestPerm = await Geolocation.requestPermissions()
+      if (requestPerm.location !== 'granted') {
+        throw new Error("Izin akses lokasi ditolak oleh pengguna.")
       }
+    }
 
-      await laporanStore.saveLaporan(payload)
+    // 2. Ambil Kordinat Secara Native
+    const position = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 10000
+    })
 
-      window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Laporan dan Lokasi berhasil dikirim!', type: 'success' } }))
+    // 3. Kirim ke Database
+    await prosesPengirimanLaporan(position.coords.latitude, position.coords.longitude)
 
+  } catch (error) {
+    console.warn("Error GPS Capacitor:", error)
+
+    // Fallback Darurat jika gagal ambil lokasi
+    const gunakanFallback = confirm(
+      `Gagal mengambil GPS: ${error.message}\n\nPastikan GPS di HP menyala.\n\nApakah Anda ingin melanjutkan pengiriman dengan koordinat simulasi (Default Samsat Bekasi)?`
+    )
+
+    if (gunakanFallback) {
+      await prosesPengirimanLaporan(-6.2700806, 107.1481756)
+    } else {
       isLoadingGPS.value = false
-      showModal.value = false
-
-      // Reset form
-      formData.value = { perusahaan: '', status: 'Telah Dikunjungi', catatan: '' }
-    },
-    (error) => {
-      // 2. Error Callback (Lokasi Gagal Didapat)
-      isLoadingGPS.value = false
-      alert("Gagal mendapatkan lokasi GPS. Mohon izinkan akses lokasi (GPS) pada pengaturan browser/HP Anda.")
-    },
-    // 3. Options
-    { enableHighAccuracy: true, timeout: 10000 }
-  )
+    }
+  }
 }
 </script>
 
