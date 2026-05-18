@@ -1,6 +1,6 @@
 <template>
   <div class="h-[100dvh] flex flex-col bg-gray-50 overflow-hidden font-sans relative">
-
+    
     <!-- HEADER (Melayang di atas Map) -->
     <div class="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent pt-6 pb-12 px-4 flex items-start justify-between z-[500] pointer-events-none">
       <div class="flex items-center gap-4">
@@ -12,7 +12,7 @@
           <p class="text-[10px] font-medium drop-shadow-md opacity-90">Pemantauan progres secara Real-time</p>
         </div>
       </div>
-
+      
       <!-- Indikator Live -->
       <div class="bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded-full animate-pulse flex items-center gap-1 mt-2 shadow-md">
         <div class="w-1.5 h-1.5 bg-white rounded-full"></div> LIVE
@@ -24,8 +24,8 @@
       <div id="mapMonitoring" class="w-full h-full"></div>
 
       <!-- TOMBOL RECENTER MAP -->
-      <button
-        @click="recenterMap"
+      <button 
+        @click="recenterMap" 
         class="absolute bottom-6 right-4 z-[400] w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-blue-600 hover:bg-blue-50 transition active:scale-90 border border-gray-100"
       >
         <span class="material-symbols-outlined">zoom_out_map</span>
@@ -33,20 +33,20 @@
     </div>
 
     <!-- BOTTOM SHEET (Daftar Progres Harian) -->
-    <div
+    <div 
       class="bg-white rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.15)] z-[500] flex flex-col shrink-0 relative transition-all duration-300"
       :class="isSheetExpanded ? 'h-[60vh]' : 'h-[25vh]'"
     >
       <!-- Area Handle untuk drag/klik -->
-      <div
-        @click="isSheetExpanded = !isSheetExpanded"
+      <div 
+        @click="isSheetExpanded = !isSheetExpanded" 
         class="w-full pt-3 pb-2 flex flex-col items-center cursor-pointer bg-gray-50/50 rounded-t-3xl hover:bg-gray-100 transition"
       >
         <div class="w-12 h-1.5 bg-gray-300 rounded-full mb-2"></div>
         <div class="flex justify-between items-center w-full px-6">
           <h3 class="font-bold text-gray-800 text-sm flex items-center gap-1.5">
             <span class="material-symbols-outlined text-blue-600 text-[18px]">data_usage</span>
-            Progres Hari Ini ({{ formatTanggal(today) }})
+            Progres Bulan Ini ({{ formatBulanTahun(today) }})
           </h3>
           <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-md">
             {{ completedCount }} / {{ totalLocations }} Selesai
@@ -59,10 +59,10 @@
         <!-- Input Pencarian -->
         <div class="relative mb-4">
           <span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-sm pointer-events-none">search</span>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Cari nama perusahaan atau petugas..."
+          <input 
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="Cari nama perusahaan atau petugas..." 
             class="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-xs bg-gray-50"
           />
         </div>
@@ -72,8 +72,8 @@
         </div>
 
         <div class="space-y-2.5">
-          <div
-            v-for="loc in filteredLocations"
+          <div 
+            v-for="loc in filteredLocations" 
             :key="loc.id"
             @click="focusToLocation(loc)"
             class="border border-gray-100 rounded-xl p-3 flex items-center justify-between shadow-sm cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition group"
@@ -81,13 +81,13 @@
             <div class="flex items-center gap-3 overflow-hidden">
               <!-- Indikator Warna Petugas -->
               <div class="w-3 h-3 rounded-full shrink-0 shadow-sm border border-gray-200" :style="{ backgroundColor: loc.color }"></div>
-
+              
               <div class="min-w-0 flex-1">
                 <h4 class="font-bold text-gray-800 text-[13px] truncate" :class="loc.isCompleted ? 'text-green-700' : ''">
                   {{ loc.nama }}
                 </h4>
                 <p class="text-[10px] text-gray-500 font-medium mt-0.5 truncate flex items-center gap-1">
-                  <span class="material-symbols-outlined text-[10px]">person</span>
+                  <span class="material-symbols-outlined text-[10px]">person</span> 
                   {{ loc.petugas || 'Belum ditugaskan' }}
                 </p>
               </div>
@@ -129,13 +129,12 @@ const isSheetExpanded = ref(false)
 const searchQuery = ref('')
 const today = new Date()
 
-// Helper format tanggal
-const formatDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const todayStr = formatDateStr(today)
+// Helper format bulan dan tahun
+const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-function formatTanggal(dateObj) {
+function formatBulanTahun(dateObj) {
   const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-  return `${dateObj.getDate()} ${monthNames[dateObj.getMonth()]}`
+  return `${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`
 }
 
 onMounted(async () => {
@@ -153,14 +152,14 @@ onUnmounted(() => {
 const mappedLocations = computed(() => {
   // Hanya ambil lokasi rute perusahaan (atau bisa semua jika mau)
   const perusahaanList = ruteStore.lokasiList.filter(l => (!l.kategori || l.kategori === 'Perusahaan'))
-
+  
   return perusahaanList.map(loc => {
     // 1. Cari warna petugas
     const petugasObj = ruteStore.petugasList.find(p => p.nama === loc.petugas)
     const color = petugasObj ? petugasObj.warna : '#94a3b8'
 
-    // 2. Cek apakah ada laporan HARI INI untuk perusahaan ini
-    const isCompleted = laporanStore.laporanList.some(r => r.perusahaan === loc.nama && r.date === todayStr)
+    // 2. Cek apakah ada laporan BULAN INI untuk perusahaan ini
+    const isCompleted = laporanStore.laporanList.some(r => r.perusahaan === loc.nama && r.date && r.date.startsWith(currentMonthStr))
 
     return { ...loc, color, isCompleted }
   })
@@ -173,8 +172,8 @@ const completedCount = computed(() => mappedLocations.value.filter(l => l.isComp
 const filteredLocations = computed(() => {
   if (!searchQuery.value) return mappedLocations.value
   const q = searchQuery.value.toLowerCase()
-  return mappedLocations.value.filter(l =>
-    l.nama.toLowerCase().includes(q) ||
+  return mappedLocations.value.filter(l => 
+    l.nama.toLowerCase().includes(q) || 
     (l.petugas && l.petugas.toLowerCase().includes(q))
   )
 })
@@ -232,18 +231,18 @@ function renderMarkers() {
   mappedLocations.value.forEach(loc => {
     if (!loc.lat || !loc.lng) return
 
-    const marker = L.marker([loc.lat, loc.lng], {
+    const marker = L.marker([loc.lat, loc.lng], { 
       icon: createMonitoringIcon(loc.color, loc.isCompleted),
       zIndexOffset: loc.isCompleted ? 1000 : 0 // Marker yang selesai prioritas tampil di atas
     })
-
+    
     // Popup info ketika pin diklik
     marker.bindPopup(`
       <div class="text-center font-sans p-1">
         <h3 class="font-bold text-[13px] text-gray-800 border-b pb-1 mb-1">${loc.nama}</h3>
         <p class="text-[10px] text-gray-600 mb-2">Petugas: <span class="font-bold" style="color: ${loc.color}">${loc.petugas || 'Belum diassign'}</span></p>
-        ${loc.isCompleted
-          ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold">✓ Telah Dikunjungi</span>'
+        ${loc.isCompleted 
+          ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold">✓ Telah Dikunjungi</span>' 
           : '<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-bold">Menunggu Kunjungan</span>'
         }
       </div>
@@ -263,10 +262,10 @@ function renderMarkers() {
 function focusToLocation(loc) {
   if (!map) return
   isSheetExpanded.value = false // Tutup sheet sebentar
-
+  
   // Terbang ke lokasi
   map.flyTo([loc.lat, loc.lng], 16, { duration: 1.5 })
-
+  
   // Cari dan buka popup marker terkait
   setTimeout(() => {
     markersGroup.eachLayer(layer => {

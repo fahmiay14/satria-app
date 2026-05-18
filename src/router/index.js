@@ -22,6 +22,7 @@ import LaporanView from '../views/LaporanView.vue'
 import LaporanPetugasView from '../views/LaporanPetugasView.vue'
 import MonitoringView from '../views/MonitoringView.vue'
 import LaporanStatistikView from '../views/LaporanStatistikView.vue'
+import DesktopAdminView from '../views/DesktopAdminView.vue'
 
 const routes = [
   { path: '/', component: SplashView },
@@ -45,7 +46,8 @@ const routes = [
   { path: '/laporan', component: LaporanView },
   { path: '/laporan/harian', component: LaporanPetugasView },
   { path: '/laporan/monitoring', component: MonitoringView },
-  { path: '/laporan/statistik', component: LaporanStatistikView }
+  { path: '/laporan/statistik', component: LaporanStatistikView },
+  { path: '/desktop/dashboard', component: DesktopAdminView }
 ]
 
 const router = createRouter({
