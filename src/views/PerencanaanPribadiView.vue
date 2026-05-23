@@ -1,17 +1,14 @@
 <template>
   <div class="h-[100dvh] flex flex-col bg-gray-50 overflow-hidden relative">
 
-    <!-- HEADER -->
     <div class="bg-green-700 text-white px-4 py-4 flex items-center justify-between shadow-md pt-6 shrink-0 z-[500]">
       <div class="flex items-center gap-4">
-        <!-- Kembali ke Menu Perencanaan -->
         <button @click="router.push('/rute/perencanaan')" class="p-1 hover:bg-white/10 rounded-full transition flex items-center justify-center">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <h1 class="text-lg font-medium">Perencanaan Pribadi</h1>
       </div>
 
-      <!-- Tombol Aksi Kanan -->
       <div class="flex gap-2">
         <button @click="bukaLaporan" class="p-1.5 bg-teal-500 hover:bg-teal-400 rounded-lg transition text-xs font-bold flex items-center gap-1">
           <span class="material-symbols-outlined text-[16px]">print</span> Laporan
@@ -19,11 +16,9 @@
       </div>
     </div>
 
-    <!-- LEAFLET MAP CONTAINER -->
     <div class="flex-1 relative z-10 bg-slate-200">
       <div id="mapPribadi" class="w-full h-full"></div>
 
-      <!-- Tombol Target Lokasi Saya (Floating Action Button) -->
       <button
         @click="centerOnUser"
         class="absolute right-4 z-[400] w-12 h-12 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-all duration-300 active:scale-95"
@@ -34,7 +29,6 @@
       </button>
     </div>
 
-    <!-- BOTTOM SHEET (Detail Lokasi saat Marker diklik) -->
     <div
       class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[500] transition-transform duration-300 transform"
       :class="selectedLokasi ? 'translate-y-0' : 'translate-y-full'"
@@ -56,21 +50,18 @@
           </button>
         </div>
 
-        <div class="bg-green-50 border border-green-100 rounded-xl p-4 mb-4">
-          <label class="block text-xs font-bold text-green-800 mb-2 uppercase tracking-wide">Tugaskan Kepada:</label>
-          <select
-            v-model="selectedLokasi.petugas"
-            @change="updatePetugas(selectedLokasi)"
-            class="w-full text-sm p-2.5 border border-green-200 rounded-lg outline-none focus:ring-2 focus:ring-green-500 bg-white font-medium"
+        <div class="mt-4 mb-4">
+          <button
+            @click="bukaGoogleMaps(selectedLokasi.lat, selectedLokasi.lng)"
+            class="w-full bg-[#10499b] hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
           >
-            <option value="">-- Belum Ditugaskan --</option>
-            <option v-for="p in store.petugasList" :key="p.id" :value="p.nama">{{ p.nama }}</option>
-          </select>
+            <span class="material-symbols-outlined text-[20px]">map</span>
+            Buka Alamat di Google Maps
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- MODAL LAPORAN -->
     <div v-if="showLaporanModal" class="absolute inset-0 z-[600] bg-black/60 flex flex-col justify-center items-center p-2 sm:p-4">
       <div class="bg-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden animate-slide-up">
 
@@ -154,7 +145,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRuteStore } from '../stores/rute'
-import { Geolocation } from '@capacitor/geolocation' // Tambahkan ini
+import { Geolocation } from '@capacitor/geolocation'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -163,8 +154,8 @@ const store = useRuteStore()
 
 let map = null
 let markersGroup = null
-let userMarker = null // Penampung untuk Pin Lokasi User (Titik Biru)
-let watchId = null // ID Tracker GPS agar bisa dimatikan saat keluar
+let userMarker = null
+let watchId = null
 
 const selectedLokasi = ref(null)
 const showLaporanModal = ref(false)
@@ -182,11 +173,10 @@ onMounted(async () => {
   await store.loadPetugas()
   await store.loadLokasi()
   initMap()
-  startLiveTracking() // Jalankan fitur GPS secara Real-time saat halaman dibuka
+  startLiveTracking()
 })
 
 onUnmounted(() => {
-  // Matikan sensor GPS saat pindah halaman agar baterai HP awet
   if (watchId) {
     Geolocation.clearWatch({ id: watchId })
   }
@@ -212,10 +202,19 @@ function initMap() {
   renderMarkers()
 }
 
+// === LOGIKA FITUR BUKA GOOGLE MAPS ===
+function bukaGoogleMaps(lat, lng) {
+  if (!lat || !lng) return;
+  // URL ini akan otomatis membuka aplikasi Google Maps di HP jika terinstal,
+  // atau membuka browser Google Maps jika diakses lewat web.
+  const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  window.open(url, '_blank');
+}
+// =====================================
+
 // === LOGIKA FITUR LIVE GPS TRACKING ===
 async function startLiveTracking() {
   try {
-    // 1. Cek & Minta Izin Lokasi di Android
     const checkPerm = await Geolocation.checkPermissions()
     if (checkPerm.location !== 'granted') {
       const requestPerm = await Geolocation.requestPermissions()
@@ -225,7 +224,6 @@ async function startLiveTracking() {
       }
     }
 
-    // 2. Pantau Pergerakan (Watch Position)
     watchId = await Geolocation.watchPosition(
       { enableHighAccuracy: true, timeout: 10000 },
       (position, err) => {
@@ -243,7 +241,6 @@ async function startLiveTracking() {
     )
   } catch (error) {
     console.error("Fitur GPS Gagal:", error)
-    // Fallback darurat (Mendukung testing web/simulasi browser)
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition((pos) => {
         userLocation.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
@@ -253,12 +250,10 @@ async function startLiveTracking() {
   }
 }
 
-// Menampilkan & Menggeser Titik Biru di Peta
 function updateUserMarker(lat, lng) {
   if (!map) return
 
   if (!userMarker) {
-    // Jika belum ada, buat icon Titik Biru yang berkedip
     const blueDotIcon = L.divIcon({
       className: 'live-location-marker',
       html: `
@@ -271,15 +266,12 @@ function updateUserMarker(lat, lng) {
       iconAnchor: [9, 9]
     })
 
-    // Buat marker dan atur zIndexOffset sangat tinggi agar titik pengguna selalu paling atas
     userMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 9999 }).addTo(map)
   } else {
-    // Jika sudah ada, cukup geser koordinatnya (animasi smooth bawaan Leaflet)
     userMarker.setLatLng([lat, lng])
   }
 }
 
-// Fungsi Saat Tombol "My Location" Ditekan
 function centerOnUser() {
   if (map && userLocation.value) {
     map.flyTo([userLocation.value.lat, userLocation.value.lng], 16, { animate: true, duration: 1.5 })
@@ -325,10 +317,6 @@ function renderMarkers() {
 
     markersGroup.addLayer(marker)
   })
-}
-
-async function updatePetugas(lokasi) {
-  await store.saveLokasi(lokasi)
 }
 
 function siapkanDataLaporan() {
