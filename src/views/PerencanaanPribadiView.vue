@@ -11,7 +11,7 @@
         <h1 class="text-lg font-medium">Perencanaan Pribadi</h1>
       </div>
 
-      <!-- Tombol Aksi Kanan (Fitur Tambah Petugas Dihilangkan) -->
+      <!-- Tombol Aksi Kanan -->
       <div class="flex gap-2">
         <button @click="bukaLaporan" class="p-1.5 bg-teal-500 hover:bg-teal-400 rounded-lg transition text-xs font-bold flex items-center gap-1">
           <span class="material-symbols-outlined text-[16px]">print</span> Laporan
@@ -19,9 +19,19 @@
       </div>
     </div>
 
-    <!-- LEAFLET MAP CONTAINER (Clean tanpa legenda melayang) -->
+    <!-- LEAFLET MAP CONTAINER -->
     <div class="flex-1 relative z-10 bg-slate-200">
       <div id="mapPribadi" class="w-full h-full"></div>
+
+      <!-- Tombol Target Lokasi Saya (Floating Action Button) -->
+      <button
+        @click="centerOnUser"
+        class="absolute right-4 z-[400] w-12 h-12 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-all duration-300 active:scale-95"
+        :class="selectedLokasi ? 'bottom-[240px]' : 'bottom-6'"
+        title="Fokus ke lokasi saya"
+      >
+        <span class="material-symbols-outlined text-[24px]">my_location</span>
+      </button>
     </div>
 
     <!-- BOTTOM SHEET (Detail Lokasi saat Marker diklik) -->
@@ -29,7 +39,7 @@
       class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[500] transition-transform duration-300 transform"
       :class="selectedLokasi ? 'translate-y-0' : 'translate-y-full'"
     >
-      <div v-if="selectedLokasi" class="p-5">
+      <div v-if="selectedLokasi" class="p-5 pb-8">
         <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-4"></div>
         <div class="flex justify-between items-start mb-4">
           <div>
@@ -141,9 +151,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRuteStore } from '../stores/rute'
+import { Geolocation } from '@capacitor/geolocation' // Tambahkan ini
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -152,10 +163,13 @@ const store = useRuteStore()
 
 let map = null
 let markersGroup = null
+let userMarker = null // Penampung untuk Pin Lokasi User (Titik Biru)
+let watchId = null // ID Tracker GPS agar bisa dimatikan saat keluar
 
 const selectedLokasi = ref(null)
 const showLaporanModal = ref(false)
 const reportData = ref(null)
+const userLocation = ref(null)
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -168,6 +182,14 @@ onMounted(async () => {
   await store.loadPetugas()
   await store.loadLokasi()
   initMap()
+  startLiveTracking() // Jalankan fitur GPS secara Real-time saat halaman dibuka
+})
+
+onUnmounted(() => {
+  // Matikan sensor GPS saat pindah halaman agar baterai HP awet
+  if (watchId) {
+    Geolocation.clearWatch({ id: watchId })
+  }
 })
 
 const filteredLokasiMap = computed(() => {
@@ -189,6 +211,84 @@ function initMap() {
   markersGroup = L.layerGroup().addTo(map)
   renderMarkers()
 }
+
+// === LOGIKA FITUR LIVE GPS TRACKING ===
+async function startLiveTracking() {
+  try {
+    // 1. Cek & Minta Izin Lokasi di Android
+    const checkPerm = await Geolocation.checkPermissions()
+    if (checkPerm.location !== 'granted') {
+      const requestPerm = await Geolocation.requestPermissions()
+      if (requestPerm.location !== 'granted') {
+        console.warn("Izin akses lokasi ditolak oleh pengguna.")
+        return
+      }
+    }
+
+    // 2. Pantau Pergerakan (Watch Position)
+    watchId = await Geolocation.watchPosition(
+      { enableHighAccuracy: true, timeout: 10000 },
+      (position, err) => {
+        if (err) {
+          console.warn("Kesalahan membaca GPS:", err)
+          return
+        }
+        if (position) {
+          const lat = position.coords.latitude
+          const lng = position.coords.longitude
+          userLocation.value = { lat, lng }
+          updateUserMarker(lat, lng)
+        }
+      }
+    )
+  } catch (error) {
+    console.error("Fitur GPS Gagal:", error)
+    // Fallback darurat (Mendukung testing web/simulasi browser)
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition((pos) => {
+        userLocation.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        updateUserMarker(pos.coords.latitude, pos.coords.longitude)
+      })
+    }
+  }
+}
+
+// Menampilkan & Menggeser Titik Biru di Peta
+function updateUserMarker(lat, lng) {
+  if (!map) return
+
+  if (!userMarker) {
+    // Jika belum ada, buat icon Titik Biru yang berkedip
+    const blueDotIcon = L.divIcon({
+      className: 'live-location-marker',
+      html: `
+        <div style="position: relative; width: 18px; height: 18px;">
+          <div class="blue-dot-pulse"></div>
+          <div class="blue-dot-core"></div>
+        </div>
+      `,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    })
+
+    // Buat marker dan atur zIndexOffset sangat tinggi agar titik pengguna selalu paling atas
+    userMarker = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 9999 }).addTo(map)
+  } else {
+    // Jika sudah ada, cukup geser koordinatnya (animasi smooth bawaan Leaflet)
+    userMarker.setLatLng([lat, lng])
+  }
+}
+
+// Fungsi Saat Tombol "My Location" Ditekan
+function centerOnUser() {
+  if (map && userLocation.value) {
+    map.flyTo([userLocation.value.lat, userLocation.value.lng], 16, { animate: true, duration: 1.5 })
+  } else {
+    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Sedang mencari lokasi GPS Anda...', type: 'error' } }))
+  }
+}
+// ======================================
+
 
 function createCustomIcon(color) {
   return L.divIcon({
@@ -397,6 +497,32 @@ function cetakLaporan() {
   }, 500)
 }
 </script>
+
+<style>
+/* Style Khusus untuk Titik Biru Live Location (Global agar terbaca oleh Leaflet) */
+.blue-dot-pulse {
+  position: absolute;
+  inset: 0;
+  background-color: #3b82f6;
+  border-radius: 50%;
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.blue-dot-core {
+  position: absolute;
+  inset: 0;
+  background-color: #2563eb;
+  border: 2.5px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  80% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+</style>
 
 <style scoped>
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
