@@ -62,7 +62,9 @@
           </button>
         </div>
 
-        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+        <!-- LOGIKA TAMPILAN BERDASARKAN ROLE -->
+        <!-- Jika Admin, Tampilkan Dropdown Assign Petugas -->
+        <div v-if="role === 'admin'" class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
           <label class="block text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">Tugaskan Kepada:</label>
           <select
             v-model="selectedLokasi.petugas"
@@ -73,6 +75,18 @@
             <option v-for="p in store.petugasList" :key="p.id" :value="p.nama">{{ p.nama }}</option>
           </select>
         </div>
+
+        <!-- Jika Petugas, Tampilkan Tombol Google Maps -->
+        <div v-else class="mt-4 mb-4">
+          <button
+            @click="bukaGoogleMaps(selectedLokasi.lat, selectedLokasi.lng)"
+            class="w-full bg-[#10499b] hover:bg-blue-800 text-white font-bold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
+          >
+            <span class="material-symbols-outlined text-[20px]">map</span>
+            Buka Alamat di Google Maps
+          </button>
+        </div>
+
       </div>
     </div>
 
@@ -164,6 +178,7 @@ import 'leaflet/dist/leaflet.css'
 
 const router = useRouter()
 const store = useRuteStore()
+const role = localStorage.getItem('role') || 'petugas'
 
 let map = null
 let markersGroup = null
@@ -207,6 +222,14 @@ function initMap() {
   markersGroup = L.layerGroup().addTo(map)
   renderMarkers()
 }
+
+// === LOGIKA FITUR BUKA GOOGLE MAPS (Khusus Petugas) ===
+function bukaGoogleMaps(lat, lng) {
+  if (!lat || !lng) return;
+  const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  window.open(url, '_blank');
+}
+// =======================================================
 
 function createCustomIcon(color) {
   return L.divIcon({
