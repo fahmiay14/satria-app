@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, signInAnonymously } from 'firebase/auth' // <-- Tambahkan signInAnonymously
-import { getFirestore } from 'firebase/firestore'
-
+import { getAuth, signInAnonymously } from 'firebase/auth'
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
@@ -19,6 +18,17 @@ const db = getFirestore(app)
 // TAMBAHKAN BARIS INI AGAR DIBERIKAN AKSES OLEH FIRESTORE
 signInAnonymously(auth).catch((error) => {
   console.error("Gagal login anonim Firebase:", error)
+})
+
+// =======================================================
+// AKTIFKAN MODE OFFLINE & CACHE LOKAL
+// =======================================================
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code == 'failed-precondition') {
+    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time.");
+  } else if (err.code == 'unimplemented') {
+    console.warn("Browser ini tidak mendukung mode offline Firebase.");
+  }
 })
 
 export { app, auth, db }
