@@ -6,9 +6,13 @@
       <button @click="router.push('/laporan')" class="p-1 hover:bg-white/10 rounded-full transition">
         <span class="material-symbols-outlined">arrow_back</span>
       </button>
-      <h1 class="text-lg font-semibold tracking-wide">
+      <h1 class="text-lg font-semibold tracking-wide flex-1">
         {{ role === 'admin' ? 'Pantau Laporan Harian' : 'Laporan Harian' }}
       </h1>
+      <!-- TOMBOL CETAK PDF -->
+      <button @click="cetakLaporanBulanan" class="p-2 hover:bg-white/20 rounded-full transition flex items-center justify-center bg-white/10">
+        <span class="material-symbols-outlined">print</span>
+      </button>
     </div>
 
     <!-- KALENDER CARD -->
@@ -239,6 +243,10 @@ import { useRouter } from 'vue-router'
 import { useLaporanStore } from '../stores/laporan'
 import { useRuteStore } from '../stores/rute'
 import { Geolocation } from '@capacitor/geolocation' // IMPORT PLUGIN NATIVE CAPACITOR
+import jsPDF from 'jspdf' // IMPORT JSPDF
+
+// Import autoTable dengan cara ini agar kompatibel dengan Vite/Vue 3
+import autoTable from 'jspdf-autotable'
 
 const router = useRouter()
 const laporanStore = useLaporanStore()
@@ -416,6 +424,166 @@ async function kirimLaporan() {
     } else {
       isLoadingGPS.value = false
     }
+  }
+}
+
+// === LOGIKA CETAK PDF ===
+function cetakLaporanBulanan() {
+  try {
+    // 1. Ambil data laporan sesuai bulan dan tahun yang aktif di kalender
+    const currentMonthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
+
+    let laporanBulanIni = laporanStore.laporanList.filter(r =>
+      r.date && r.date.startsWith(currentMonthStr)
+    );
+
+    // Jika yang login petugas, filter hanya laporannya sendiri.
+    if (role === 'petugas') {
+      laporanBulanIni = laporanBulanIni.filter(r => r.petugas === currentUser);
+    }
+
+    if (laporanBulanIni.length === 0) {
+      alert(`Tidak ada laporan pada bulan ${monthNames[currentMonth.value]} ${currentYear.value} untuk dicetak.`);
+      return;
+    }
+
+    // 2. Inisialisasi jsPDF
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    const periode = `${monthNames[currentMonth.value]} ${currentYear.value}`;
+
+    // Hitung Statistik
+    const totalObjek = laporanBulanIni.length;
+    let unitRusak = 0;
+    let unitTidakBerfungsi = 0;
+
+    // Format Data Tabel & Pemindaian Catatan
+    const tableData = laporanBulanIni.map((item, index) => {
+      let kondisiMeter = "Berfungsi dengan baik";
+
+      if (item.catatan) {
+          kondisiMeter = item.catatan;
+          const catatanLower = item.catatan.toLowerCase();
+          // Cerdas mendeteksi status dari teks catatan
+          if (catatanLower.includes('rusak')) {
+              unitRusak++;
+          } else if (catatanLower.includes('tidak berfungsi')) {
+              unitTidakBerfungsi++;
+          }
+      } else if (item.status === 'Terjadi Masalah') {
+          kondisiMeter = "Water meter bermasalah / Perlu Pengecekan";
+          unitTidakBerfungsi++; // Default fallback
+      }
+
+      return [
+        index + 1,
+        item.perusahaan,
+        item.status === 'Telah Dikunjungi' ? 'Telah dikunjungi' : item.status,
+        kondisiMeter
+      ];
+    });
+
+    const laporanBermasalah = unitRusak + unitTidakBerfungsi;
+    const laporanBagus = totalObjek - laporanBermasalah;
+
+    // --- MULAI PENULISAN PDF (GAYA FORMAL DOCX) ---
+
+    // Judul Header
+    doc.setFont("times", "bold");
+    doc.setFontSize(12);
+    doc.text("LAPORAN PETUGAS PENELUSURAN", pageWidth / 2, 20, { align: 'center' });
+    doc.text("PAJAK METER AIR PERMUKAAN", pageWidth / 2, 26, { align: 'center' });
+
+    // Info Ringkasan (Dibuat sejajar titik duanya)
+    doc.setFontSize(11);
+    doc.setFont("times", "normal");
+    const startYInfo = 40;
+    const lineHeight = 6;
+
+    // Koordinat X untuk membuat rata kiri titik dua (:)
+    const col1X = margin;
+    const col2X = 45;
+    const col3X = 48;
+
+    doc.text("Jenis Laporan", col1X, startYInfo);
+    doc.text(":", col2X, startYInfo);
+    doc.text("Penelusuran dan evaluasi kondisi water meter", col3X, startYInfo);
+
+    doc.text("Objek", col1X, startYInfo + lineHeight);
+    doc.text(":", col2X, startYInfo + lineHeight);
+    doc.text("Perusahaan/PDAM", col3X, startYInfo + lineHeight);
+
+    doc.text("Periode", col1X, startYInfo + lineHeight * 2);
+    doc.text(":", col2X, startYInfo + lineHeight * 2);
+    doc.text(periode, col3X, startYInfo + lineHeight * 2);
+
+    doc.text("Total Objek", col1X, startYInfo + lineHeight * 3);
+    doc.text(":", col2X, startYInfo + lineHeight * 3);
+    doc.text(`${totalObjek} Perusahaan`, col3X, startYInfo + lineHeight * 3);
+
+    // Pembuatan Tabel yang bergaya dokumen formal (Abu-abu / Hitam Putih)
+    autoTable(doc, {
+      startY: startYInfo + lineHeight * 4,
+      head: [['No', 'Nama Perusahaan', 'Status', 'Kondisi Water Meter']],
+      body: tableData,
+      theme: 'grid',
+      // Style tabel disesuaikan layaknya Microsoft Word
+      headStyles: { fillColor: [230, 230, 230], textColor: [0, 0, 0], fontStyle: 'bold', font: 'times', lineColor: [0, 0, 0], lineWidth: 0.1 },
+      bodyStyles: { textColor: [0, 0, 0], font: 'times', lineColor: [0, 0, 0], lineWidth: 0.1 },
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 12 },
+        1: { cellWidth: 65 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 'auto' }
+      }
+    });
+
+    // Merangkai kalimat rincian rusak / tidak berfungsi
+    let rincianBermasalah = "";
+    if (laporanBermasalah > 0) {
+        if (unitRusak > 0 && unitTidakBerfungsi > 0) {
+            rincianBermasalah = `, terdiri dari ${unitRusak} unit rusak dan ${unitTidakBerfungsi} unit tidak berfungsi`;
+        } else if (unitRusak > 0) {
+            rincianBermasalah = `, terdiri dari ${unitRusak} unit rusak`;
+        } else if (unitTidakBerfungsi > 0) {
+            rincianBermasalah = `, terdiri dari ${unitTidakBerfungsi} unit tidak berfungsi`;
+        }
+    }
+
+    // Penulisan Kesimpulan
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFont("times", "bold");
+    doc.text("Kesimpulan", margin, finalY);
+
+    doc.setFont("times", "normal");
+    const kesimpulanTeks = `Berdasarkan hasil penelusuran, petugas telah melakukan kunjungan ke ${totalObjek} perusahaan yang telah ditugaskan. Seluruh objek tercatat telah dikunjungi. Dari hasil pemeriksaan kondisi water meter, terdapat ${laporanBagus} water meter berfungsi dengan baik dan ${laporanBermasalah} water meter memerlukan tindak lanjut${rincianBermasalah}.`;
+
+    const kesimpulanTeks2 = `Pelaksanaan kunjungan berjalan tanpa kendala berarti. Namun, objek dengan water meter rusak atau tidak berfungsi perlu menjadi prioritas evaluasi, terutama untuk memastikan validitas data pengukuran dan keberlanjutan pemantauan pajak meter air permukaan.`;
+
+    // Auto wrap text
+    const splitText1 = doc.splitTextToSize(kesimpulanTeks, pageWidth - (margin * 2));
+    doc.text(splitText1, margin, finalY + 6);
+
+    const finalY2 = finalY + 6 + (splitText1.length * 5);
+    const splitText2 = doc.splitTextToSize(kesimpulanTeks2, pageWidth - (margin * 2));
+    doc.text(splitText2, margin, finalY2);
+
+    // Penulisan Tanda Tangan (Merata Kanan)
+    const signatureY = finalY2 + (splitText2.length * 5) + 15;
+    doc.text("Petugas Penelusuran,", pageWidth - margin, signatureY, { align: 'right' });
+
+    doc.setFont("times", "bold");
+    doc.text(currentUser, pageWidth - margin, signatureY + 25, { align: 'right' });
+
+    // 3. Download / Simpan File
+    const namaFile = `Laporan_Penelusuran_${monthNames[currentMonth.value]}_${currentYear.value}.pdf`;
+    doc.save(namaFile);
+
+  } catch (error) {
+    console.error("Gagal membuat PDF:", error);
+    alert("Terjadi kesalahan saat memproses laporan PDF: " + error.message);
   }
 }
 </script>

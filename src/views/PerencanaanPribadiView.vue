@@ -1,6 +1,7 @@
 <template>
   <div class="h-[100dvh] flex flex-col bg-gray-50 overflow-hidden relative">
 
+    <!-- HEADER -->
     <div class="bg-green-700 text-white px-4 py-4 flex items-center justify-between shadow-md pt-6 shrink-0 z-[500]">
       <div class="flex items-center gap-4">
         <button @click="router.push('/rute/perencanaan')" class="p-1 hover:bg-white/10 rounded-full transition flex items-center justify-center">
@@ -8,17 +9,13 @@
         </button>
         <h1 class="text-lg font-medium">Perencanaan Pribadi</h1>
       </div>
-
-      <div class="flex gap-2">
-        <button @click="bukaLaporan" class="p-1.5 bg-teal-500 hover:bg-teal-400 rounded-lg transition text-xs font-bold flex items-center gap-1">
-          <span class="material-symbols-outlined text-[16px]">print</span> Laporan
-        </button>
-      </div>
     </div>
 
+    <!-- AREA PETA -->
     <div class="flex-1 relative z-10 bg-slate-200">
-      <div id="mapPribadi" class="w-full h-full"></div>
+      <div id="mapPribadi" class="w-full h-full z-0"></div>
 
+      <!-- Tombol Fokus ke Lokasi Saya -->
       <button
         @click="centerOnUser"
         class="absolute right-4 z-[400] w-12 h-12 bg-white rounded-full shadow-lg border border-gray-100 flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-all duration-300 active:scale-95"
@@ -29,6 +26,7 @@
       </button>
     </div>
 
+    <!-- MODAL DETAIL LOKASI (MUNCUL DARI BAWAH) -->
     <div
       class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[500] transition-transform duration-300 transform"
       :class="selectedLokasi ? 'translate-y-0' : 'translate-y-full'"
@@ -62,82 +60,6 @@
       </div>
     </div>
 
-    <div v-if="showLaporanModal" class="absolute inset-0 z-[600] bg-black/60 flex flex-col justify-center items-center p-2 sm:p-4">
-      <div class="bg-gray-100 rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden animate-slide-up">
-
-        <div class="p-4 border-b border-teal-700 flex justify-between items-center bg-teal-600 text-white shrink-0">
-          <h3 class="font-bold flex items-center gap-2">
-            <span class="material-symbols-outlined">description</span> Pratinjau Penempatan (Pribadi)
-          </h3>
-          <button @click="showLaporanModal = false" class="text-teal-100 hover:text-white"><span class="material-symbols-outlined">close</span></button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-100">
-          <div v-if="!reportData || reportData.total === 0" class="text-center text-gray-500 py-10">
-            Data rute pribadi kosong.
-          </div>
-
-          <div v-else class="max-w-4xl mx-auto space-y-6">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center flex flex-col justify-center">
-                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Pribadi</span>
-                <span class="text-2xl font-black text-gray-800 mt-1">{{ reportData.total }}</span>
-              </div>
-              <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center flex flex-col justify-center">
-                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Petugas Aktif</span>
-                <span class="text-2xl font-black text-blue-600 mt-1">{{ reportData.petugasCount }}</span>
-              </div>
-              <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center flex flex-col justify-center">
-                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Telah Ditangani</span>
-                <span class="text-2xl font-black text-green-600 mt-1">{{ reportData.assigned }} <span class="text-xs font-normal text-gray-500">({{ reportData.percent }}%)</span></span>
-              </div>
-              <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center flex flex-col justify-center">
-                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tanpa Petugas</span>
-                <span class="text-2xl font-black mt-1" :class="reportData.unassigned.length > 0 ? 'text-red-600' : 'text-gray-400'">{{ reportData.unassigned.length }}</span>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div v-for="(group, pName) in reportData.grouped" :key="pName" class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden max-h-[350px]">
-                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center shrink-0">
-                  <h4 class="font-bold text-sm text-gray-800 uppercase truncate pr-2">{{ pName }}</h4>
-                  <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-md shrink-0">{{ group.list.length }} Lokasi</span>
-                </div>
-                <div class="flex-1 overflow-y-auto p-2 bg-gray-50 space-y-2">
-                  <div v-if="group.list.length === 0" class="p-6 text-center text-xs text-gray-400 italic">Belum ada penugasan</div>
-                  <div v-else v-for="(loc, idx) in group.list" :key="loc.id" class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex items-center">
-                    <span class="w-6 text-center text-gray-400 font-medium text-xs mr-2 shrink-0">{{ idx + 1 }}</span>
-                    <span class="font-medium text-gray-700 text-sm truncate">{{ loc.nama }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div v-if="reportData.unassigned.length > 0" class="bg-white rounded-xl shadow-sm border border-red-200 flex flex-col overflow-hidden max-h-[350px]">
-                <div class="bg-red-50 px-4 py-3 border-b border-red-200 flex justify-between items-center shrink-0">
-                  <h4 class="font-bold text-sm text-red-800 uppercase truncate pr-2">Belum Diassign</h4>
-                  <span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-1 rounded-md shrink-0">{{ reportData.unassigned.length }} Lokasi</span>
-                </div>
-                <div class="flex-1 overflow-y-auto p-2 bg-red-50 space-y-2">
-                  <div v-for="(loc, idx) in reportData.unassigned" :key="loc.id" class="bg-white border border-red-200 rounded-lg p-3 shadow-sm flex items-center">
-                    <span class="w-6 text-center text-red-400 font-medium text-xs mr-2 shrink-0">{{ idx + 1 }}</span>
-                    <span class="font-bold text-red-700 text-sm truncate">{{ loc.nama }}</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        <div class="p-4 border-t border-gray-200 bg-white flex justify-end items-center shrink-0">
-          <span class="text-xs text-gray-400 mr-4 hidden sm:block">Laporan PDF akan menggunakan format tabel formal.</span>
-          <button @click="cetakLaporan" class="bg-[#10499b] hover:bg-blue-800 text-white px-6 py-3 rounded-xl shadow flex items-center gap-2 text-sm font-bold transition active:scale-95">
-            <span class="material-symbols-outlined text-[18px]">print</span> CETAK LAPORAN (PDF)
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 </template>
 
@@ -152,46 +74,77 @@ import 'leaflet/dist/leaflet.css'
 const router = useRouter()
 const store = useRuteStore()
 
+// State Reaktif untuk UI
+const selectedLokasi = ref(null)
+const userLocation = ref(null)
+
+// Variabel Non-Reaktif untuk Leaflet (PENTING: Jangan gunakan ref() untuk objek Leaflet)
 let map = null
 let markersGroup = null
 let userMarker = null
 let watchId = null
 
-const selectedLokasi = ref(null)
-const showLaporanModal = ref(false)
-const reportData = ref(null)
-const userLocation = ref(null)
+// Memperbaiki masalah ikon default Leaflet pada Vite/Webpack
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import iconUrl from 'leaflet/dist/images/marker-icon.png'
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconRetinaUrl,
+  iconUrl,
+  shadowUrl,
 })
 
+// === LIFECYCLE ===
 onMounted(async () => {
-  await store.loadPetugas()
-  await store.loadLokasi()
-  initMap()
-  startLiveTracking()
-})
-
-onUnmounted(() => {
-  if (watchId) {
-    Geolocation.clearWatch({ id: watchId })
+  try {
+    await store.loadPetugas()
+    await store.loadLokasi()
+    initMap()
+    startLiveTracking()
+  } catch (error) {
+    console.error("Gagal memuat data awal:", error)
   }
 })
 
+onUnmounted(() => {
+  // Membersihkan GPS Tracker
+  if (watchId) {
+    Geolocation.clearWatch({ id: watchId }).catch(err => console.warn(err))
+  }
+
+  // Membersihkan Instance Map agar tidak memory leak atau error saat kembali ke halaman ini
+  if (map) {
+    map.off()
+    map.remove()
+    map = null
+  }
+})
+
+// === FILTER DATA PRIBADI ===
 const filteredLokasiMap = computed(() => {
   return store.lokasiList.filter(loc => loc.kategori === 'Pribadi')
 })
 
+// Pantau perubahan data rute dari store, lalu render ulang marker
 watch(() => store.lokasiList, () => {
-  renderMarkers()
-  selectedLokasi.value = null
+  if (map) {
+    renderMarkers()
+    selectedLokasi.value = null
+  }
 }, { deep: true })
 
+// === INISIALISASI PETA ===
 function initMap() {
+  const mapContainer = document.getElementById('mapPribadi')
+  if (!mapContainer) return
+
+  // Mencegah inisialisasi ganda
+  if (map !== null) {
+    map.remove()
+  }
+
   map = L.map('mapPribadi', { zoomControl: false }).setView([-6.27, 107.14], 12)
   L.control.zoom({ position: 'topleft' }).addTo(map)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -204,13 +157,10 @@ function initMap() {
 
 // === LOGIKA FITUR BUKA GOOGLE MAPS ===
 function bukaGoogleMaps(lat, lng) {
-  if (!lat || !lng) return;
-  // URL ini akan otomatis membuka aplikasi Google Maps di HP jika terinstal,
-  // atau membuka browser Google Maps jika diakses lewat web.
-  const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  window.open(url, '_blank');
+  if (!lat || !lng) return
+  const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+  window.open(url, '_blank')
 }
-// =====================================
 
 // === LOGIKA FITUR LIVE GPS TRACKING ===
 async function startLiveTracking() {
@@ -240,12 +190,16 @@ async function startLiveTracking() {
       }
     )
   } catch (error) {
-    console.error("Fitur GPS Gagal:", error)
+    console.error("Fitur GPS Capacitor Gagal, mencoba Web API fallback:", error)
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition((pos) => {
-        userLocation.value = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        updateUserMarker(pos.coords.latitude, pos.coords.longitude)
-      })
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        userLocation.value = { lat, lng }
+        updateUserMarker(lat, lng)
+      }, (err) => {
+        console.warn("Web Geolocation Error:", err)
+      }, { enableHighAccuracy: true })
     }
   }
 }
@@ -276,12 +230,12 @@ function centerOnUser() {
   if (map && userLocation.value) {
     map.flyTo([userLocation.value.lat, userLocation.value.lng], 16, { animate: true, duration: 1.5 })
   } else {
+    // Gunakan alert browser bawaan atau Custom Event jika ada UI toast khusus
     window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Sedang mencari lokasi GPS Anda...', type: 'error' } }))
   }
 }
-// ======================================
 
-
+// === MERENDER MARKER PERUSAHAAN ===
 function createCustomIcon(color) {
   return L.divIcon({
     className: 'custom-marker',
@@ -294,16 +248,20 @@ function createCustomIcon(color) {
 }
 
 function renderMarkers() {
-  if (!markersGroup) return
+  if (!map || !markersGroup) return
+
   markersGroup.clearLayers()
 
   filteredLokasiMap.value.forEach(loc => {
+    // Proteksi jika data lat/lng tidak valid
+    if (!loc.lat || !loc.lng) return;
+
     const petugasObj = store.petugasList.find(p => p.nama === loc.petugas)
-    const pinColor = petugasObj ? petugasObj.warna : '#94a3b8'
+    const pinColor = petugasObj ? (petugasObj.warna || '#94a3b8') : '#94a3b8'
 
     const marker = L.marker([loc.lat, loc.lng], { icon: createCustomIcon(pinColor) })
 
-    marker.bindTooltip(loc.nama, {
+    marker.bindTooltip(loc.nama || 'Lokasi', {
       permanent: true,
       direction: 'top',
       className: 'company-label-tooltip',
@@ -317,172 +275,6 @@ function renderMarkers() {
 
     markersGroup.addLayer(marker)
   })
-}
-
-function siapkanDataLaporan() {
-  const companies = filteredLokasiMap.value
-  const petugas = store.petugasList
-
-  let grouped = {}
-  let unassigned = []
-
-  petugas.forEach(p => grouped[p.nama] = { list: [] })
-
-  companies.forEach(c => {
-    if (!c.petugas || c.petugas === '') {
-      unassigned.push(c)
-    } else {
-      if(!grouped[c.petugas]) grouped[c.petugas] = { list: [] }
-      grouped[c.petugas].list.push(c)
-    }
-  })
-
-  const total = companies.length
-  const assigned = total - unassigned.length
-  const percent = total === 0 ? 0 : Math.round((assigned / total) * 100)
-
-  reportData.value = {
-    total,
-    petugasCount: petugas.length,
-    assigned,
-    percent,
-    unassigned,
-    grouped
-  }
-}
-
-function bukaLaporan() {
-  siapkanDataLaporan()
-  showLaporanModal.value = true
-}
-
-function cetakLaporan() {
-  if (!reportData.value) return;
-
-  const data = reportData.value;
-  const tgl = new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})
-
-  let html = `
-    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px;">
-      <h2 style="font-size: 18px; font-weight: bold; text-transform: uppercase; margin: 0; letter-spacing: 1px; color: #000;">Laporan Penempatan Petugas</h2>
-      <h3 style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 5px 0 0 0; color: #000;">Data Rute Pribadi</h3>
-      <p style="font-size: 11px; color: #555; margin: 8px 0 0 0;">Tanggal Cetak: ${tgl}</p>
-    </div>
-
-    <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 25px; background-color: #f9fafb;">
-      <tr>
-        <td style="width: 25%; text-align: center; border-right: 1px solid #ccc; padding: 10px;">
-          <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #555;">Total Pribadi</div>
-          <div style="font-size: 20px; font-weight: bold; margin-top: 5px; color: #000;">${data.total}</div>
-        </td>
-        <td style="width: 25%; text-align: center; border-right: 1px solid #ccc; padding: 10px;">
-          <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #555;">Petugas Aktif</div>
-          <div style="font-size: 20px; font-weight: bold; margin-top: 5px; color: #0066cc;">${data.petugasCount}</div>
-        </td>
-        <td style="width: 25%; text-align: center; border-right: 1px solid #ccc; padding: 10px;">
-          <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #555;">Ditangani</div>
-          <div style="font-size: 20px; font-weight: bold; margin-top: 5px; color: #16a34a;">${data.assigned} <span style="font-size: 11px; font-weight: normal; color: #666;">(${data.percent}%)</span></div>
-        </td>
-        <td style="width: 25%; text-align: center; padding: 10px;">
-          <div style="font-size: 10px; font-weight: bold; text-transform: uppercase; color: #555;">Tanpa Petugas</div>
-          <div style="font-size: 20px; font-weight: bold; margin-top: 5px; color: ${data.unassigned.length > 0 ? '#dc2626' : '#94a3b8'};">${data.unassigned.length}</div>
-        </td>
-      </tr>
-    </table>
-    <div style="column-count: 2; column-gap: 30px;">
-  `
-
-  for (let pName in data.grouped) {
-    let list = data.grouped[pName].list
-    html += `
-      <div style="break-inside: avoid; margin-bottom: 20px; page-break-inside: avoid;">
-        <table style="width: 100%; border-bottom: 1px solid #000; margin-bottom: 8px; border-collapse: collapse;">
-          <tr>
-            <td style="font-size: 12px; font-weight: bold; text-transform: uppercase; color: #000; padding: 0 0 5px 0; vertical-align: bottom;">${pName}</td>
-            <td style="font-size: 10px; font-weight: bold; color: #000; padding: 0 0 5px 0; vertical-align: bottom; text-align: right;">Total: ${list.length}</td>
-          </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-          <thead>
-            <tr style="background-color: #f3f4f6;">
-              <th style="border: 1px solid #000; padding: 6px; font-size: 10px; text-align: center; width: 30px; color: #000;">No</th>
-              <th style="border: 1px solid #000; padding: 6px; font-size: 10px; text-align: left; color: #000;">Nama Titik Rute</th>
-            </tr>
-          </thead>
-          <tbody>
-    `
-    if(list.length === 0) {
-      html += `<tr><td colspan="2" style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 10px; color: #666; font-style: italic;">Belum ada tugas</td></tr>`
-    } else {
-      list.forEach((c, idx) => {
-        html += `
-          <tr>
-            <td style="border: 1px solid #000; padding: 6px; text-align: center; font-size: 10px; color: #000;">${idx + 1}</td>
-            <td style="border: 1px solid #000; padding: 6px; font-size: 10px; font-weight: 500; color: #000;">${c.nama}</td>
-          </tr>`
-      })
-    }
-    html += `</tbody></table></div>`
-  }
-
-  if(data.unassigned.length > 0) {
-    html += `
-      <div style="break-inside: avoid; margin-bottom: 20px; page-break-inside: avoid;">
-        <table style="width: 100%; border-bottom: 1px solid #dc2626; margin-bottom: 8px; border-collapse: collapse;">
-          <tr>
-            <td style="font-size: 12px; font-weight: bold; text-transform: uppercase; color: #dc2626; padding: 0 0 5px 0; vertical-align: bottom;">BELUM ADA PETUGAS</td>
-            <td style="font-size: 10px; font-weight: bold; color: #dc2626; padding: 0 0 5px 0; vertical-align: bottom; text-align: right;">Total: ${data.unassigned.length}</td>
-          </tr>
-        </table>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #dc2626;">
-          <thead>
-            <tr style="background-color: #fef2f2;">
-              <th style="border: 1px solid #dc2626; padding: 6px; font-size: 10px; text-align: center; width: 30px; color: #991b1b;">No</th>
-              <th style="border: 1px solid #dc2626; padding: 6px; font-size: 10px; text-align: left; color: #991b1b;">Nama Titik Rute</th>
-            </tr>
-          </thead>
-          <tbody>
-    `
-    data.unassigned.forEach((c, idx) => {
-      html += `
-        <tr style="background-color: #fef2f2;">
-          <td style="border: 1px solid #dc2626; padding: 6px; text-align: center; font-size: 10px; color: #991b1b;">${idx + 1}</td>
-          <td style="border: 1px solid #dc2626; padding: 6px; font-size: 10px; font-weight: bold; color: #991b1b;">${c.nama}</td>
-        </tr>`
-    })
-    html += `</tbody></table></div>`
-  }
-
-  html += `</div>`
-
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
-  document.body.appendChild(iframe)
-
-  const doc = iframe.contentWindow.document
-  doc.open()
-  doc.write(`
-    <html>
-    <head>
-      <title>Laporan_Penempatan_Petugas_Pribadi</title>
-      <style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #000; background: #fff; margin: 0; }
-        table { page-break-inside: auto; }
-        tr { page-break-inside: avoid; page-break-after: auto; }
-      </style>
-    </head>
-    <body>${html}</body>
-    </html>
-  `)
-  doc.close()
-
-  setTimeout(() => {
-    iframe.contentWindow.focus()
-    iframe.contentWindow.print()
-    setTimeout(() => document.body.removeChild(iframe), 1000)
-  }, 500)
 }
 </script>
 
@@ -513,9 +305,6 @@ function cetakLaporan() {
 </style>
 
 <style scoped>
-.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-@keyframes slideUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
-
 :deep(.leaflet-container) { z-index: 10 !important; }
 
 :deep(.company-label-tooltip) {

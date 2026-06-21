@@ -15,10 +15,18 @@ export const useJadwalStore = defineStore('jadwal', () => {
     loading.value = true
     try {
       const snapshot = await getDocs(collection(db, ...jadwalPath))
-      const rawData = snapshot.docs.map(docu => ({
-        id: docu.id,
-        ...docu.data()
-      }))
+      const rawData = snapshot.docs.map(docu => {
+        const data = docu.data()
+        return {
+          id: docu.id,
+          // Menerjemahkan dari ERD ke format UI
+          title: data.judul_kegiatan || data.title || '',
+          date: data.tanggal || data.date || '',
+          time: data.waktu || data.time || '',
+          location: data.lokasi || data.location || '',
+          type: data.kategori_jadwal || data.type || 'lapangan'
+        }
+      })
 
       jadwalList.value = rawData
       arsipStore.triggerSync() // Panggil efek loading bar di bawah
@@ -33,15 +41,18 @@ export const useJadwalStore = defineStore('jadwal', () => {
   async function saveJadwal(data) {
     loading.value = true
     try {
+      // === PAYLOAD SESUAI STRUKTUR ERD ===
       const payload = {
-        title: data.title,
-        date: data.date,
-        time: data.time,
-        location: data.location,
-        type: data.type // 'lapangan' atau 'rapat'
+        judul_kegiatan: data.title,
+        tanggal: data.date,
+        waktu: data.time,
+        lokasi: data.location,
+        kategori_jadwal: data.type, // 'lapangan' atau 'rapat'
+        id_user: localStorage.getItem('userId') || '',
+        created_at: new Date().toISOString()
       }
-      const docId = data.id ? data.id.toString() : Date.now().toString()
-      await setDoc(doc(db, ...jadwalPath, docId), payload)
+      const docId = data.id ? data.id.toString() : `JADWAL-${Date.now()}`
+      await setDoc(doc(db, ...jadwalPath, docId), payload, { merge: true })
       await loadJadwal()
     } catch (error) {
       console.error('SAVE JADWAL ERROR:', error)

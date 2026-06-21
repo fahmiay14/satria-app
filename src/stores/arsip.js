@@ -36,7 +36,7 @@ export const useArsipStore = defineStore(
       icon: 'sync',
       color: 'blue'
     })
-    
+
     let syncTimeout = null
 
     function triggerSync() {
@@ -69,23 +69,27 @@ export const useArsipStore = defineStore(
       loading.value = true
       try {
         const snapshot = await getDocs(collection(db, ...arsipPath))
-        
+
         const rawData = snapshot.docs.map(docu => {
           const d = docu.data()
           return {
             id: docu.id,
-            // Membaca format camelCase (baru) ATAU format Title Case (lama dari CSV)
-            noSurat: d.noSurat || d['Nomor Surat'] || '0',
-            nopol: d.nopol || d['Nopol'] || '',
-            // Merapikan status agar selalu kapital di awal (Tersedia / Dipinjam)
-            status: d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1).toLowerCase()) 
-                             : (d['Status'] ? (d['Status'].charAt(0).toUpperCase() + d['Status'].slice(1).toLowerCase()) : 'Tersedia')
+            id_arsip: docu.id, // Sesuai ERD
+            // Backwards compatibility dengan data lama
+            no_surat: d.no_surat || parseInt(d.noSurat) || parseInt(d['Nomor Surat']) || 0,
+            no_polisi: d.no_polisi || d.nopol || d['Nopol'] || '',
+            status: d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1).toLowerCase()) : 'Tersedia',
+            id_admin: d.id_admin || '',
+            nama_admin: d.nama_admin || '',
+            id_box: d.id_box || '',
+            nama_box: d.nama_box || '',
+            created_at: d.created_at || ''
           }
         })
 
         // SORTING FINAL: Mengurutkan murni berdasarkan Nomor Surat (tertinggi di atas)
-        rawData.sort((a, b) => Number(b.noSurat) - Number(a.noSurat))
-        
+        rawData.sort((a, b) => Number(b.no_surat) - Number(a.no_surat))
+
         arsipList.value = rawData
         triggerSync()
       } catch (error) {
@@ -96,20 +100,26 @@ export const useArsipStore = defineStore(
     }
 
     /* =========================
-       SAVE DATA ARSIP
+       SAVE DATA ARSIP (SESUAI ERD)
     ========================= */
     async function saveArsip(data) {
       loading.value = true
       try {
-        // Payload baku untuk ke depannya
+        const docId = data.id ? data.id.toString() : `ARSIP-${Date.now()}`
+
         const payload = {
-          noSurat: data.noSurat,
-          nopol: data.nopol,
-          status: data.status
+          no_surat: parseInt(data.no_surat),
+          no_polisi: data.no_polisi,
+          status: data.status,
+          id_admin: localStorage.getItem('userId') || 'ADMIN_UNKNOWN',
+          nama_admin: localStorage.getItem('nama') || 'Admin',
+          id_box: data.id_box || '',
+          nama_box: data.nama_box || '',
+          created_at: data.created_at || new Date().toISOString(),
+          update: new Date().toISOString()
         }
-        const docId = data.id ? data.id.toString() : Date.now().toString()
-        await setDoc(doc(db, ...arsipPath, docId), payload)
-        
+
+        await setDoc(doc(db, ...arsipPath, docId), payload, { merge: true })
         await loadArsip() // Refresh data
       } catch (error) {
         console.error('SAVE ARSIP ERROR:', error)
@@ -142,10 +152,24 @@ export const useArsipStore = defineStore(
         const snapshot = await getDocs(collection(db, ...boxPath))
         boxList.value = snapshot.docs.map(docu => {
            const d = docu.data()
+           // Menangani kompatibilitas data lama jika ada
+           let rAwal = d.range_awal || 0
+           let rAkhir = d.range_akhir || 0
+
+           if (d.range) {
+             const split = d.range.split('-')
+             rAwal = parseInt(split[0]) || 0
+             rAkhir = parseInt(split[1]) || 0
+           }
+
            return {
               id: docu.id,
-              nama: d.nama || d['Nama Box'] || '',
-              range: d.range || d['Range Isi'] || ''
+              id_box: docu.id, // Sesuai ERD
+              nama_box: d.nama_box || d.nama || d['Nama Box'] || '',
+              range_awal: parseInt(rAwal),
+              range_akhir: parseInt(rAkhir),
+              id_admin: d.id_admin || '',
+              created_at: d.created_at || ''
            }
         })
         triggerSync()
@@ -157,17 +181,23 @@ export const useArsipStore = defineStore(
     }
 
     /* =========================
-       SAVE BOX
+       SAVE BOX (SESUAI ERD)
     ========================= */
     async function saveBox(data) {
       loading.value = true
       try {
+        const docId = data.id ? data.id.toString() : `BOX-${Date.now()}`
+
         const payload = {
-          nama: data.nama,
-          range: data.range
+          nama_box: data.nama_box,
+          range_awal: parseInt(data.range_awal),
+          range_akhir: parseInt(data.range_akhir),
+          id_admin: localStorage.getItem('userId') || 'ADMIN_UNKNOWN',
+          created_at: data.created_at || new Date().toISOString(),
+          update: new Date().toISOString()
         }
-        const docId = data.id ? data.id.toString() : Date.now().toString()
-        await setDoc(doc(db, ...boxPath, docId), payload)
+
+        await setDoc(doc(db, ...boxPath, docId), payload, { merge: true })
         await loadBox()
       } catch (error) {
         console.error('SAVE BOX ERROR:', error)
@@ -192,21 +222,18 @@ export const useArsipStore = defineStore(
     }
 
     /* =========================
-       SEARCH
+       SEARCH & TOOLS
     ========================= */
     function cariArsip(keyword) {
       const key = keyword.trim().toUpperCase()
-      return arsipList.value.filter(item => item.nopol.toUpperCase().includes(key))
+      return arsipList.value.filter(item => item.no_polisi.toUpperCase().includes(key))
     }
 
     function cariLokasiBox(noSurat) {
       const nomor = parseInt(noSurat)
       for (const box of boxList.value) {
-        const split = box.range.split('-')
-        const awal = parseInt(split[0])
-        const akhir = parseInt(split[1])
-        if (nomor >= awal && nomor <= akhir) {
-          return box.nama
+        if (nomor >= box.range_awal && nomor <= box.range_akhir) {
+          return box.nama_box
         }
       }
       return 'Belum masuk box'

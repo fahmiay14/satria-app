@@ -100,6 +100,30 @@
               >
             </div>
 
+            <!-- Input Email dan Telepon (SESUAI ERD BARU) -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Email</label>
+                <input
+                  v-model="formData.email"
+                  type="email"
+                  required
+                  placeholder="budi@email.com"
+                  class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                >
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">No Telepon</label>
+                <input
+                  v-model="formData.no_telp"
+                  type="tel"
+                  required
+                  placeholder="081234..."
+                  class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                >
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-3">
               <!-- Input NIK / NIP -->
               <div>
@@ -205,6 +229,8 @@ const formData = ref({
   id: null,
   nama_lengkap: '',
   nik: '',
+  email: '',
+  no_telp: '',
   password: '',
   role: 'petugas',
   warna: '#10499b' // Default warna
@@ -232,7 +258,14 @@ async function loadUsers() {
   isLoading.value = true
   try {
     const snapshot = await getDocs(collection(db, ...usersPath))
-    usersList.value = snapshot.docs.map(docu => ({ id: docu.id, ...docu.data() }))
+    usersList.value = snapshot.docs.map(docu => {
+      const data = docu.data()
+      return {
+        id: docu.id,
+        ...data,
+        warna: data.warna_user || data.warna // Menerjemahkan warna_user ERD ke warna UI
+      }
+    })
   } catch (error) {
     console.error("Gagal memuat pengguna:", error)
   } finally {
@@ -246,6 +279,8 @@ function openTambahModal() {
     id: null,
     nama_lengkap: '',
     nik: '',
+    email: '',
+    no_telp: '',
     password: '',
     role: 'petugas',
     warna: generateRandomColor() // Buatkan warna random saat tambah baru
@@ -257,7 +292,9 @@ function openEditModal(user) {
   isEdit.value = true
   formData.value = {
     ...user,
-    warna: user.warna || generateRandomColor(), // Pertahankan warna lama, jika null beri random
+    email: user.email || '',
+    no_telp: user.no_telp || '',
+    warna: user.warna_user || user.warna || generateRandomColor(), // Pertahankan warna lama, jika null beri random
     password: '' // Kosongkan password di form edit
   }
   showModal.value = true
@@ -273,12 +310,14 @@ async function simpanUser() {
   isSaving.value = true
 
   try {
-    // PAYLOAD BERSIH (nama_lengkap, nik, role, warna)
+    // === PAYLOAD BERSIH (SESUAI ERD) ===
     const payload = {
       nama_lengkap: formData.value.nama_lengkap,
       nik: nikBersih,
+      email: formData.value.email,
+      no_telp: formData.value.no_telp,
       role: formData.value.role,
-      warna: formData.value.warna,
+      warna_user: formData.value.warna,
       updatedAt: new Date().toISOString()
     }
 

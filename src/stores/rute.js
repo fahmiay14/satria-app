@@ -1,24 +1,32 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '../services/firebase'
-import { collection, getDocs, setDoc, deleteDoc, doc, query, where } from 'firebase/firestore'
+import {
+  collection,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  doc,
+  query,
+  where
+} from 'firebase/firestore'
 
 export const useRuteStore = defineStore('rute', () => {
-  // PATH FIREBASE
-  const rutePath = ['artifacts', 'SatriaApp', 'public', 'data', 'data_rute']
+  // PATH FIREBASE SESUAI ERD
+  const rutePath = ['artifacts', 'SatriaApp', 'public', 'data', 'rute']
   const usersPath = ['artifacts', 'SatriaApp', 'public', 'data', 'users_account']
 
+  // STATE
   const lokasiList = ref([])
   const petugasList = ref([])
   const loading = ref(false)
 
-  // Helper: Buat ID String Acak (Contoh: RUTE-xY9zQ1wE4rTy)
+  // HELPER: Generate ID
   function generateId(prefix) {
-    const randomStr = Math.random().toString(36).substring(2, 14).toUpperCase()
-    return `${prefix}-${randomStr}`
+    return `${prefix}-${Date.now()}`
   }
 
-  // 1. Load Data Petugas
+  // 1. LOAD PETUGAS (Khusus yang memiliki role petugas)
   async function loadPetugas() {
     loading.value = true
     try {
@@ -28,78 +36,104 @@ export const useRuteStore = defineStore('rute', () => {
       )
       const snapshot = await getDocs(q)
 
-      petugasList.value = snapshot.docs.map(doc => {
-        const data = doc.data()
+      petugasList.value = snapshot.docs.map(docu => {
+        const data = docu.data()
         return {
-          id: doc.id,
-          nama: data.nama || data.nama_lengkap || 'Tanpa Nama',
-          username: data.username || data.nik || '',
-          warna: data.warna || '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
+          id: docu.id,
+          nama: data.nama_lengkap || data.nama || 'Tanpa Nama',
+          username: data.nik || data.username || '',
+          warna: data.warna_user || data.warna || '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
         }
       })
     } catch (error) {
-      console.error("Gagal memuat daftar petugas:", error)
+      console.error("Error load petugas:", error)
     } finally {
       loading.value = false
     }
   }
 
-  // 2. Load Lokasi Rute berdasarkan Aturan Hak Akses (Privasi)
+  // 2. LOAD LOKASI RUTE (DENGAN NORMALISASI KATEGORI LOKAL)
   async function loadLokasi() {
     loading.value = true
     lokasiList.value = []
 
     const currentUserId = localStorage.getItem('userId') || 'UNKNOWN_USER'
+    const userRole = localStorage.getItem('role') || 'petugas'
 
     try {
-      // QUERY 1: Ambil data Perusahaan (Semua role melihat ini)
-      const perusahaanQuery = query(
-        collection(db, ...rutePath),
-        where('kategori', '==', 'Perusahaan')
-      )
+      // Ambil seluruh data rute tanpa filter 'where' dari Firebase
+      // Agar data lama (legacy) yang belum memiliki atribut 'kategori' tetap terbaca
+      const snapshot = await getDocs(collection(db, ...rutePath))
 
-      // QUERY 2: Ambil data Pribadi (Hanya milik user yang sedang login)
-      const pribadiQuery = query(
-        collection(db, ...rutePath),
-        where('kategori', '==', 'Pribadi'),
-        where('id_user_petugas', '==', currentUserId)
-      )
-
-      // Eksekusi kedua Query secara paralel agar lebih cepat
-      const [perusahaanSnap, pribadiSnap] = await Promise.all([
-        getDocs(perusahaanQuery),
-        getDocs(pribadiQuery)
-      ])
-
-      // Gabungkan hasilnya (Tambahkan id agar kompatibel dengan view)
       const allDocs = []
-      perusahaanSnap.forEach(docu => allDocs.push({ id: docu.id, id_rute: docu.id, ...docu.data() }))
-      pribadiSnap.forEach(docu => allDocs.push({ id: docu.id, id_rute: docu.id, ...docu.data() }))
+
+      snapshot.docs.forEach(docu => {
+        const d = docu.data()
+
+        // === NORMALISASI KATEGORI ===
+        // Jika kosong/tidak ada, otomatis dianggap sebagai 'Perusahaan'
+        let kat = d.kategori ? d.kategori.toString().trim() : 'Perusahaan'
+
+        // Perbaiki penulisan (case-insensitive) agar seragam
+        if (kat.toLowerCase() === 'perusahaan') {
+          kat = 'Perusahaan'
+        } else if (kat.toLowerCase() === 'pribadi') {
+          kat = 'Pribadi'
+        } else {
+          // Fallback aman
+          kat = 'Perusahaan'
+        }
+
+        const idPetugas = d.id_petugas || d.id_user_petugas || ''
+
+        // Map ERD ke struktur UI
+        const mappedDoc = {
+          id: docu.id,
+          id_rute: docu.id,
+          nama: d.nama_lokasi || d.nama || '',
+          lat: parseFloat(d.latitude || d.lat || 0),
+          lng: parseFloat(d.longitude || d.lng || 0),
+          kategori: kat,
+          petugas: d.nama_petugas || d.petugas || '',
+          id_petugas: idPetugas
+        }
+
+        // === FILTER VISIBILITAS (HAK AKSES) ===
+        if (kat === 'Perusahaan') {
+          // Rute Perusahaan: Bisa dilihat semua role (Admin & Petugas)
+          allDocs.push(mappedDoc)
+        } else if (kat === 'Pribadi') {
+          // Rute Pribadi: Hanya admin ATAU petugas pembuatnya yang bisa melihat
+          if (userRole === 'admin' || idPetugas === currentUserId) {
+            allDocs.push(mappedDoc)
+          }
+        }
+      })
 
       lokasiList.value = allDocs
 
     } catch (error) {
-      console.error("Gagal memuat lokasi:", error)
+      console.error("Error load lokasi:", error)
     } finally {
       loading.value = false
     }
   }
 
-  // 3. Simpan Lokasi (Create & Update)
+  // 3. SIMPAN LOKASI (CREATE & UPDATE)
   async function saveLokasi(lokasiData) {
     loading.value = true
     const currentUserId = localStorage.getItem('userId') || 'UNKNOWN_USER'
     const currentUserName = localStorage.getItem('nama') || 'UNKNOWN_NAME'
 
     try {
-      // Cek apakah ini data baru atau update (dukungan untuk id dan id_rute)
       const isNew = !(lokasiData.id || lokasiData.id_rute)
       const docId = isNew ? generateId('RUTE') : (lokasiData.id_rute || lokasiData.id)
 
+      // Payload Sesuai ERD Baru
       let payload = {
-        nama: lokasiData.nama,
-        lat: parseFloat(lokasiData.lat),
-        lng: parseFloat(lokasiData.lng),
+        nama_lokasi: lokasiData.nama,
+        latitude: String(lokasiData.lat), // Disimpan sbg Varchar
+        longitude: String(lokasiData.lng), // Disimpan sbg Varchar
         kategori: lokasiData.kategori || 'Perusahaan',
         updated_at: new Date().toISOString()
       }
@@ -108,60 +142,48 @@ export const useRuteStore = defineStore('rute', () => {
         payload.created_at = new Date().toISOString()
 
         if (payload.kategori === 'Pribadi') {
-          // RUTE PRIBADI: Admin dikosongkan, Petugas diisi dengan pembuat
-          payload.id_user_admin = ""
+          payload.id_admin = ""
           payload.nama_admin = ""
-          payload.id_user_petugas = currentUserId
+          payload.id_petugas = currentUserId
           payload.nama_petugas = currentUserName
-          payload.petugas = currentUserName // Menjaga kompatibilitas UI
         } else {
-          // RUTE PERUSAHAAN
-          payload.id_user_admin = currentUserId
+          payload.id_admin = currentUserId
           payload.nama_admin = currentUserName
-          payload.id_user_petugas = lokasiData.id_user_petugas || ""
-          payload.nama_petugas = lokasiData.nama_petugas || ""
-          payload.petugas = lokasiData.petugas || ""
+          payload.id_petugas = lokasiData.id_petugas || ""
+          payload.nama_petugas = lokasiData.petugas || ""
         }
       } else {
-        // UPDATE RUTE (Pemetaan ulang nama_petugas & id_user_petugas jika petugas diganti)
+        // Logika Update Assign Petugas
         if (lokasiData.petugas) {
-          payload.petugas = lokasiData.petugas
+          payload.nama_petugas = lokasiData.petugas
           const p = petugasList.value.find(x => x.nama === lokasiData.petugas)
-          if (p) {
-            payload.id_user_petugas = p.id
-            payload.nama_petugas = p.nama
-          } else {
-            payload.id_user_petugas = ""
-            payload.nama_petugas = ""
-          }
+          payload.id_petugas = p ? p.id : ""
         } else {
-          payload.petugas = ""
-          payload.id_user_petugas = ""
           payload.nama_petugas = ""
+          payload.id_petugas = ""
         }
       }
 
-      // Simpan ke Firestore (Gunakan merge: true agar data lain yang tidak diedit tidak hilang)
+      // Merge: true agar atribut lama di database tidak terhapus jika di-update
       await setDoc(doc(db, ...rutePath, docId), payload, { merge: true })
 
-      // Refresh data di memori
+      // Reload setelah simpan
       await loadLokasi()
-
     } catch (error) {
-      console.error("Gagal menyimpan lokasi:", error)
+      console.error("Error save lokasi:", error)
     } finally {
       loading.value = false
     }
   }
 
-  // 4. Hapus Lokasi
-  async function deleteLokasi(id_rute) {
+  // 4. HAPUS LOKASI
+  async function deleteLokasi(id) {
     loading.value = true
     try {
-      await deleteDoc(doc(db, ...rutePath, id_rute))
-      await loadLokasi()
+      await deleteDoc(doc(db, ...rutePath, id))
+      await loadLokasi() // Reload setelah hapus
     } catch (error) {
-      console.error("Gagal menghapus lokasi:", error)
+      console.error("Error delete lokasi:", error)
     } finally {
       loading.value = false
     }

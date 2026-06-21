@@ -20,18 +20,18 @@
       <!-- Body Form -->
       <div class="p-6 overflow-y-auto">
         <form @submit.prevent="submitForm" class="space-y-4">
-          
+
           <!-- NOMOR SURAT -->
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Nomor Surat</label>
             <input
               type="number"
-              v-model="formData.noSurat"
+              v-model="formData.no_surat"
               :readonly="!isEdit"
               :class="[
                 'w-full border border-gray-300 rounded-lg px-4 py-3 transition text-sm font-medium',
-                !isEdit 
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed focus:outline-none' 
+                !isEdit
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed focus:outline-none'
                   : 'bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none'
               ]"
             >
@@ -40,7 +40,7 @@
 
           <!-- NOPOL KENDARAAN -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Nopol Kendaraan</label>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">No Polisi Kendaraan</label>
             <div class="flex gap-2">
               <!-- Kolom 1: Huruf -->
               <input
@@ -52,7 +52,7 @@
                 required
                 class="w-16 border border-gray-300 rounded-lg px-2 py-3 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition uppercase text-center text-sm font-bold"
               >
-              
+
               <!-- Kolom 2: Wajib Angka & Auto Pindah -->
               <input
                 ref="nopol2Ref"
@@ -66,7 +66,7 @@
                 required
                 class="flex-1 border border-gray-300 rounded-lg px-2 py-3 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition uppercase text-center text-sm font-bold"
               >
-              
+
               <!-- Kolom 3: Huruf -->
               <input
                 ref="nopol3Ref"
@@ -104,7 +104,7 @@
               Simpan Data Arsip
             </button>
           </div>
-          
+
         </form>
       </div>
     </div>
@@ -125,11 +125,12 @@ const store = useArsipStore()
 
 const formData = ref({
   id: null,
-  noSurat: '',
+  no_surat: '',
   nopol1: 'B',
   nopol2: '',
   nopol3: '',
-  status: 'Tersedia'
+  status: 'Tersedia',
+  created_at: null
 })
 
 const isEdit = computed(() => !!props.editData)
@@ -145,13 +146,14 @@ watch(() => props.modelValue, (isOpen) => {
     if (props.editData) {
       // MODE EDIT
       formData.value.id = props.editData.id
-      formData.value.noSurat = props.editData.noSurat
-      
-      const parts = props.editData.nopol.split(' ')
+      formData.value.no_surat = props.editData.no_surat
+      formData.value.created_at = props.editData.created_at
+
+      const parts = props.editData.no_polisi.split(' ')
       formData.value.nopol1 = parts[0] || 'B'
       formData.value.nopol2 = parts[1] || ''
       formData.value.nopol3 = parts[2] || ''
-      
+
       formData.value.status = props.editData.status
     } else {
       // MODE TAMBAH
@@ -160,55 +162,48 @@ watch(() => props.modelValue, (isOpen) => {
       formData.value.nopol2 = ''
       formData.value.nopol3 = ''
       formData.value.status = 'Tersedia'
+      formData.value.created_at = null
 
       // Mencari Nomor Surat Terakhir di Database
       const semuaNomor = store.arsipList
-        .map(item => parseInt(item.noSurat))
+        .map(item => parseInt(item.no_surat))
         .filter(num => !isNaN(num))
-      
-      // Jika kosong, mulai dari 1. Jika ada, ambil yang terbesar lalu tambah 1
+
       const maxNoSurat = semuaNomor.length > 0 ? Math.max(...semuaNomor) : 0
-      formData.value.noSurat = (maxNoSurat + 1).toString()
+      formData.value.no_surat = (maxNoSurat + 1).toString()
     }
   }
 })
 
-// === LOGIKA INPUT NOPOL ===
-
 function handleNopol1() {
-  // Hanya huruf
   formData.value.nopol1 = formData.value.nopol1.replace(/[^a-zA-Z]/g, '').toUpperCase()
-  // Pindah jika sudah 2 huruf (opsional, karena Nopol awalan bisa 1 huruf atau 2 huruf)
   if (formData.value.nopol1.length === 2) nopol2Ref.value?.focus()
 }
 
 function handleNopol2() {
-  // Hanya izinkan angka (regex menghapus selain angka)
   formData.value.nopol2 = formData.value.nopol2.replace(/\D/g, '')
-  
-  // Jika sudah 4 angka, otomatis lompat ke kolom ke-3
-  if (formData.value.nopol2.length === 4) {
-    nopol3Ref.value?.focus()
-  }
+  if (formData.value.nopol2.length === 4) nopol3Ref.value?.focus()
 }
 
 function handleNopol3() {
-  // Hanya huruf
   formData.value.nopol3 = formData.value.nopol3.replace(/[^a-zA-Z]/g, '').toUpperCase()
 }
 
-// === LOGIKA SIMPAN ===
-
 function submitForm() {
   const nopolGabungan = `${formData.value.nopol1} ${formData.value.nopol2} ${formData.value.nopol3}`.trim()
-  
+
+  // Mencari apakah nomor surat ini masuk ke box mana
+  const namaBoxTerkait = store.cariLokasiBox(formData.value.no_surat)
+
   emit('save', {
     id: formData.value.id,
-    noSurat: formData.value.noSurat,
-    nopol: nopolGabungan,
-    status: formData.value.status
+    no_surat: parseInt(formData.value.no_surat),
+    no_polisi: nopolGabungan,
+    status: formData.value.status,
+    nama_box: namaBoxTerkait !== 'Belum masuk box' ? namaBoxTerkait : '',
+    created_at: formData.value.created_at
   })
-  
+
   close()
 }
 
@@ -218,7 +213,6 @@ function close() {
 </script>
 
 <style scoped>
-/* Animasi modal naik dari bawah layaknya aplikasi mobile native */
 .animate-slide-up {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

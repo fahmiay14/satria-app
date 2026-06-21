@@ -16,7 +16,7 @@
         <input
           v-model="searchKeyword"
           type="text"
-          placeholder="Cari Nopol Kendaraan..."
+          placeholder="Cari No Polisi Kendaraan..."
           class="w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
         />
       </div>
@@ -32,13 +32,10 @@
         </div>
 
         <div class="flex gap-2">
-          <!-- Input File Tersembunyi untuk Import -->
           <input type="file" ref="fileInput" @change="importCSV" accept=".csv" class="hidden" />
-
           <button @click="triggerFileInput" class="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg shadow-sm transition text-xs font-bold active:scale-95">
             <span class="material-symbols-outlined text-[16px]">upload_file</span> Import
           </button>
-
           <button @click="exportCSV" class="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-lg shadow-sm transition text-xs font-bold active:scale-95">
             <span class="material-symbols-outlined text-[16px]">download</span> Export
           </button>
@@ -46,10 +43,10 @@
       </div>
     </div>
 
-    <!-- DAFTAR ARSIP (SCROLLABLE AREA) -->
+    <!-- DAFTAR ARSIP -->
     <div class="flex-1 overflow-y-auto px-5 pb-24 pt-2 relative" id="scroll-container" @scroll="handleScroll">
 
-      <!-- Loading Overlay -->
+      <!-- Loading -->
       <div v-if="store.loading" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center pt-10">
         <div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
         <p class="text-blue-700 font-bold text-sm">Memproses data arsip...</p>
@@ -58,7 +55,6 @@
       <div v-else-if="filteredArsip.length === 0" class="bg-white border border-dashed border-gray-300 rounded-2xl p-8 text-center mt-4">
         <span class="material-symbols-outlined text-4xl text-gray-300 mb-2">inventory_2</span>
         <p class="text-gray-500 font-medium text-sm">Tidak ada data arsip</p>
-        <p class="text-gray-400 text-xs mt-1">Gunakan tombol + atau Import untuk menambahkan arsip.</p>
       </div>
 
       <div v-else class="space-y-3">
@@ -68,13 +64,13 @@
         >
           <div class="flex justify-between items-start">
             <div class="flex-1 min-w-0 pr-4">
-              <!-- Nopol (Title) -->
-              <h3 class="font-black text-[#10499b] text-base truncate tracking-wide">{{ item.nopol }}</h3>
+              <!-- Nopol -->
+              <h3 class="font-black text-[#10499b] text-base truncate tracking-wide">{{ item.no_polisi }}</h3>
 
               <!-- Nomor Surat -->
               <div class="flex items-center gap-1.5 mt-1 text-gray-500">
                 <span class="material-symbols-outlined text-[14px]">tag</span>
-                <p class="text-xs font-medium truncate">No. Surat: {{ item.noSurat }}</p>
+                <p class="text-xs font-medium truncate">No. Surat: {{ item.no_surat }}</p>
               </div>
 
               <!-- Badge Status -->
@@ -85,10 +81,11 @@
                 >
                   {{ item.status }}
                 </span>
+                <span v-if="item.nama_box" class="ml-2 text-[10px] text-gray-400 font-medium">Box: {{ item.nama_box }}</span>
               </div>
             </div>
 
-            <!-- Tombol Aksi (Edit & Hapus) -->
+            <!-- Tombol Aksi -->
             <div class="flex flex-col gap-1.5 shrink-0">
               <button @click="openEdit(item)" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition active:scale-95">
                 <span class="material-symbols-outlined text-[16px]">edit</span>
@@ -100,14 +97,13 @@
           </div>
         </div>
 
-        <!-- Loading Paginasi / Infinite Scroll -->
         <div v-if="renderLimit < filteredArsip.length" class="p-4 text-center text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-xl animate-pulse">
           Memuat data lainnya... ({{ renderLimit }} / {{ filteredArsip.length }})
         </div>
       </div>
     </div>
 
-    <!-- FAB (Floating Action Button) Tambah -->
+    <!-- FAB -->
     <button
       @click="openTambah"
       class="absolute bottom-6 right-6 w-14 h-14 bg-[#10499b] hover:bg-blue-800 text-white rounded-full shadow-lg flex items-center justify-center transition active:scale-90 z-30"
@@ -140,66 +136,51 @@ const deleteId = ref(null)
 const deleteLabel = ref('')
 const fileInput = ref(null)
 
-// === FITUR SEARCH & PAGINATION ===
 const searchKeyword = ref('')
-const renderLimit = ref(100) // Tampil awal 100 data
+const renderLimit = ref(100)
 
 onMounted(() => {
   store.loadArsip()
 })
 
-// Menyaring data berdasarkan Nopol
 const filteredArsip = computed(() => {
   let data = store.arsipList
   if (searchKeyword.value) {
     const key = searchKeyword.value.trim().toUpperCase()
-    data = data.filter(item => item.nopol.toUpperCase().includes(key))
+    data = data.filter(item => item.no_polisi.toUpperCase().includes(key))
   }
   return data
 })
 
-// Membatasi jumlah render untuk performa
 const displayedArsip = computed(() => {
   return filteredArsip.value.slice(0, renderLimit.value)
 })
 
-// Mengatur reset paginasi saat sedang mencari
 watch(searchKeyword, () => {
   renderLimit.value = 100
-  // Otomatis kembalikan scroll ke atas saat mengetik pencarian
   const container = document.getElementById('scroll-container')
   if (container) container.scrollTo({ top: 0 })
 })
 
-// === LOGIKA INFINITE SCROLL ===
 let isScrolling = false
 function handleScroll(e) {
   if (isScrolling) return
-
   const { scrollTop, clientHeight, scrollHeight } = e.target
-
-  // Jika tersisa 50px jarak menuju paling bawah kontainer
   if (scrollTop + clientHeight >= scrollHeight - 50) {
     if (renderLimit.value < filteredArsip.value.length) {
       isScrolling = true
-
       requestAnimationFrame(() => {
-        renderLimit.value += 20 // Tambah 20 data selanjutnya sesuai instruksi
-
-        setTimeout(() => {
-          isScrolling = false
-        }, 50)
+        renderLimit.value += 20
+        setTimeout(() => { isScrolling = false }, 50)
       })
     }
   }
 }
 
-// === FUNGSI TOAST ===
 function showToast(message, type = 'success') {
   window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }))
 }
 
-// === LOGIKA CRUD ===
 function openTambah() {
   editData.value = null
   showModal.value = true
@@ -222,7 +203,7 @@ async function simpan(data) {
 
 function siapkanHapus(item) {
   deleteId.value = item.id
-  deleteLabel.value = `Arsip No. ${item.noSurat} (${item.nopol})`
+  deleteLabel.value = `Arsip No. ${item.no_surat} (${item.no_polisi})`
   showDelete.value = true
 }
 
@@ -231,11 +212,10 @@ async function eksekusiHapus() {
   showToast('Data berhasil dihapus!')
 }
 
-// === LOGIKA EXPORT & IMPORT ===
 function exportCSV() {
   if (store.arsipList.length === 0) return alert("Tidak ada data untuk diekspor")
-  let csvContent = "Nomor Surat,Nopol,Status\n"
-  store.arsipList.forEach(row => { csvContent += `"${row.noSurat}","${row.nopol}","${row.status}"\n` })
+  let csvContent = "Nomor Surat,No Polisi,Status\n"
+  store.arsipList.forEach(row => { csvContent += `"${row.no_surat}","${row.no_polisi}","${row.status}"\n` })
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement("a")
   link.setAttribute("href", URL.createObjectURL(blob))
@@ -265,7 +245,14 @@ async function importCSV(event) {
         if (cols.length >= 2) {
           const id = "ARSIP-IMP-" + Date.now() + "-" + i
           const docRef = doc(db, 'artifacts', 'SatriaApp', 'public', 'data', 'arsip', id)
-          batch.set(docRef, { noSurat: cols[0], nopol: cols[1].toUpperCase(), status: cols[2] || 'Tersedia' })
+          batch.set(docRef, {
+            no_surat: parseInt(cols[0]),
+            no_polisi: cols[1].toUpperCase(),
+            status: cols[2] || 'Tersedia',
+            id_admin: localStorage.getItem('userId'),
+            nama_admin: localStorage.getItem('nama'),
+            created_at: new Date().toISOString()
+          })
           count++
           if (count === 500) { await batch.commit(); batch = writeBatch(db); count = 0 }
         }

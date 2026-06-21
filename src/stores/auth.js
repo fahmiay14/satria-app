@@ -17,17 +17,6 @@ export const useAuthStore = defineStore('auth', {
       try {
         const cleanNik = nik.trim().toLowerCase()
 
-        // Backdoor Darurat
-        if (cleanNik === 'superadmin' && password === 'satria2024') {
-          this.setSession({
-            id: 'USER-SUPERADMIN',
-            nama_lengkap: 'Super Administrator',
-            nik: 'superadmin',
-            role: 'admin' // Menggunakan role
-          })
-          return true
-        }
-
         const usersPath = ['artifacts', 'SatriaApp', 'public', 'data', 'users_account']
 
         const q = query(
@@ -46,10 +35,12 @@ export const useAuthStore = defineStore('auth', {
           const userData = userDoc.data()
 
           this.setSession({
-            id: userDoc.id,
-            nama_lengkap: userData.nama_lengkap,
+            id: userDoc.id, // Berperan sebagai id_user
+            nama_lengkap: userData.nama_lengkap, // Sesuai ERD
             nik: userData.nik,
-            role: userData.role // Langsung ambil role dari database
+            role: userData.role,
+            email: userData.email || '',
+            no_telp: userData.no_telp || ''
           })
           return true
         }
@@ -64,10 +55,13 @@ export const useAuthStore = defineStore('auth', {
 
     setSession(userData) {
       this.user = userData
+      // Simpan di LocalStorage agar tidak hilang saat di-refresh
       localStorage.setItem('userId', userData.id)
-      localStorage.setItem('nama', userData.nama_lengkap)
+      localStorage.setItem('nama', userData.nama_lengkap) // Di UI kita pakai 'nama' untuk manggil nama_lengkap
       localStorage.setItem('nik', userData.nik)
-      localStorage.setItem('role', userData.role) // Simpan sebagai role
+      localStorage.setItem('role', userData.role)
+      localStorage.setItem('email', userData.email)
+      localStorage.setItem('no_telp', userData.no_telp)
     },
 
     logout() {

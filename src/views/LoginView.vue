@@ -153,7 +153,7 @@
 
           <!-- Forgot Password -->
           <div class="flex justify-end">
-            <a href="#" class="text-xs font-semibold text-[#10499b] hover:text-blue-700 transition-colors">
+            <a href="#" @click.prevent="openForgotModal" class="text-xs font-semibold text-[#10499b] hover:text-blue-700 transition-colors">
               Lupa kata sandi?
             </a>
           </div>
@@ -262,7 +262,7 @@
           </div>
 
           <div class="flex justify-end">
-            <a href="#" class="text-xs text-[#10499b] hover:text-blue-700 font-medium transition-colors">Lupa kata sandi?</a>
+            <a href="#" @click.prevent="openForgotModal" class="text-xs text-[#10499b] hover:text-blue-700 font-medium transition-colors">Lupa kata sandi?</a>
           </div>
 
           <div class="pt-2">
@@ -276,23 +276,50 @@
             </button>
           </div>
         </form>
-
-        <div class="relative my-6">
-          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
-          <div class="relative flex justify-center text-xs"><span class="px-3 bg-white text-gray-400">atau</span></div>
-        </div>
-
-        <div class="text-center space-y-3">
-          <p class="text-xs text-gray-500">Butuh bantuan akses? <a href="#" class="text-[#10499b] font-semibold hover:underline">Hubungi Administrator</a></p>
-        </div>
       </div>
 
       <div class="mt-auto pt-6 text-center">
-        <p class="text-xs text-gray-400 font-medium">© 2025 Satria Mobile • v1.0.0</p>
+        <p class="text-xs text-gray-400 font-medium">© 2026 Satria Mobile • v1.0.0</p>
       </div>
 
     </div>
   </div>
+
+  <!-- ========================================= -->
+  <!-- 3. MODAL LUPA KATA SANDI -->
+  <!-- ========================================= -->
+  <div v-if="showForgotModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity font-sans">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+      <div class="px-6 py-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-[#10499b] flex items-center gap-2">
+          <span class="material-symbols-outlined">lock_reset</span> Reset Sandi
+        </h3>
+        <button @click="closeForgotModal" class="text-blue-400 hover:text-red-500 transition-colors">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="p-6">
+        <p class="text-sm text-gray-600 mb-4">Masukkan NIK atau NIP Anda yang terdaftar untuk meminta reset kata sandi ke Administrator.</p>
+        <form @submit.prevent="sendToWhatsapp">
+          <div class="mb-5">
+            <label class="block text-gray-700 font-semibold text-[13px] mb-2 ml-1">NIK / NIP</label>
+            <input
+              v-model="forgotNik"
+              type="text"
+              required
+              placeholder="Masukkan NIK/NIP"
+              class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:outline-none focus:border-[#10499b] focus:bg-white transition-all text-sm font-medium"
+            />
+          </div>
+          <button type="submit" class="w-full bg-[#10499b] hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow-md transition-all active:scale-95 flex justify-center items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">chat</span>
+            Kirim via WhatsApp
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -306,6 +333,10 @@ const authStore = useAuthStore()
 const nik = ref('')
 const password = ref('')
 const showPassword = ref(false)
+
+// Variabel dan Fungsi untuk Modal Lupa Kata Sandi
+const showForgotModal = ref(false)
+const forgotNik = ref('')
 
 const isDesktop = ref(window.innerWidth >= 1024)
 
@@ -323,6 +354,29 @@ onUnmounted(() => {
 
 function togglePassword() {
   showPassword.value = !showPassword.value
+}
+
+// Fitur Buka Modal
+function openForgotModal() {
+  forgotNik.value = ''
+  showForgotModal.value = true
+}
+
+// Fitur Tutup Modal
+function closeForgotModal() {
+  showForgotModal.value = false
+}
+
+// Fitur Kirim WhatsApp
+function sendToWhatsapp() {
+  if (!forgotNik.value) return
+
+  const phoneNumber = '6283116447281'
+  const message = encodeURIComponent(`Halo Admin, saya ingin mereset kata sandi untuk akun dengan NIK/NIP: ${forgotNik.value}. Mohon bantuannya.`)
+  const waUrl = `https://wa.me/${phoneNumber}?text=${message}`
+
+  window.open(waUrl, '_blank')
+  closeForgotModal()
 }
 
 async function login() {
@@ -355,5 +409,14 @@ async function login() {
   20%, 80% { transform: translate3d(2px, 0, 0); }
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Animasi slide up untuk modal popup */
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes slideUp {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 </style>

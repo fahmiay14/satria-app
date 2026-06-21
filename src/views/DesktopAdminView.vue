@@ -144,18 +144,36 @@
 
             <!-- 2. SUB PANEL: DATA ARSIP -->
             <div v-if="activeMenu === 'arsip'" class="space-y-4">
+              <!-- Aksi Import/Export Arsip -->
+              <div class="flex gap-2 mb-2">
+                <input type="file" ref="fileInputArsip" @change="importCSVArsip" accept=".csv" class="hidden" />
+                <button @click="triggerImportArsip" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer" :class="theme.btnAction">
+                  <span class="material-symbols-outlined text-sm">upload_file</span> Import
+                </button>
+                <button @click="exportCSVArsip" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer" :class="theme.btnAction">
+                  <span class="material-symbols-outlined text-sm">download</span> Export
+                </button>
+              </div>
+
               <div class="relative">
                 <span class="material-symbols-outlined absolute left-3 top-2.5 text-sm transition-colors" :class="theme.textSub">search</span>
                 <input v-model="searchQueryArsip" type="text" placeholder="Cari Nopol kendaraan..." class="w-full border rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-blue-500 transition-colors" :class="theme.inputBg" />
               </div>
 
               <div class="space-y-2">
-                <div v-for="arsip in filteredArsip" :key="arsip.id" class="border p-3 rounded-xl flex justify-between items-center transition-colors duration-300" :class="theme.cardBg">
+                <div v-for="arsip in filteredArsip" :key="arsip.id" class="border p-3 rounded-xl flex justify-between items-start transition-colors duration-300" :class="theme.cardBg">
                   <div>
-                    <h4 class="font-mono text-sm font-black tracking-wide transition-colors" :class="theme.textMain">{{ arsip.nopol }}</h4>
-                    <p class="text-[10px] mt-0.5 transition-colors" :class="theme.textMuted">No. Surat: {{ arsip.no_surat }}</p>
+                    <h4 class="font-mono text-sm font-black tracking-wide transition-colors" :class="theme.textMain">{{ arsip.no_polisi }}</h4>
+                    <div class="flex items-center gap-3 mt-1.5">
+                      <p class="text-[10px] transition-colors flex items-center gap-1" :class="theme.textMuted">
+                        <span class="material-symbols-outlined text-[12px]">tag</span> No. {{ arsip.no_surat }}
+                      </p>
+                      <p class="text-[10px] transition-colors flex items-center gap-1" :class="theme.textMuted">
+                        <span class="material-symbols-outlined text-[12px]">inventory_2</span> {{ arsip.nama_box || 'Belum masuk box' }}
+                      </p>
+                    </div>
                   </div>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded border transition-colors" :class="arsip.status === 'Tersedia' ? theme.bgGreen : theme.bgAmber">
+                  <span class="text-[10px] font-bold px-2 py-0.5 mt-1 rounded border transition-colors shrink-0" :class="arsip.status === 'Tersedia' ? theme.bgGreen : theme.bgAmber">
                     {{ arsip.status }}
                   </span>
                 </div>
@@ -289,6 +307,10 @@ import { useArsipStore } from '../stores/arsip'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+// Tambahan import Firebase agar Import CSV berjalan
+import { writeBatch, doc } from 'firebase/firestore'
+import { db } from '../services/firebase'
+
 const router = useRouter()
 const ruteStore = useRuteStore()
 const laporanStore = useLaporanStore()
@@ -302,6 +324,8 @@ const searchQuery = ref('')
 const searchQueryArsip = ref('')
 const today = new Date()
 const activeNotifications = ref([]) // State untuk Pop-up Notifikasi Melayang
+
+const fileInputArsip = ref(null) // Referensi DOM untuk input file CSV Arsip
 
 const currentAdmin = localStorage.getItem('nama') || 'ADMINISTRATOR'
 
@@ -322,6 +346,7 @@ const theme = computed(() => isDarkMode.value ? {
   profileBg: 'bg-slate-950/50 border-slate-800',
   profileCard: 'bg-slate-900 border-slate-800',
   btnRed: 'bg-red-950/40 hover:bg-red-900/60 border-red-900/50 text-red-400',
+  btnAction: 'bg-slate-900 border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white',
   panelBg: 'bg-slate-900/40 border-slate-800',
   panelHeader: 'bg-slate-950/20 border-slate-800',
   inputBg: 'bg-slate-950 border-slate-800 text-slate-200 placeholder-slate-500',
@@ -362,6 +387,7 @@ const theme = computed(() => isDarkMode.value ? {
   profileBg: 'bg-gray-50 border-gray-200',
   profileCard: 'bg-white border-gray-200',
   btnRed: 'bg-red-50 hover:bg-red-100 border-red-200 text-red-600',
+  btnAction: 'bg-white border-gray-300 hover:bg-gray-100 text-gray-700 hover:text-gray-900',
   panelBg: 'bg-gray-50 border-gray-200',
   panelHeader: 'bg-white/80 border-gray-200',
   inputBg: 'bg-white border-gray-300 text-gray-800 placeholder-gray-400',
@@ -507,20 +533,116 @@ const petugasStats = computed(() => {
   }).filter(p => p.target > 0)
 })
 
-// Filter List Pencarian
+// Filter List Pencarian Monitoring
 const filteredLocations = computed(() => {
   if (!searchQuery.value) return mappedLocations.value
   const q = searchQuery.value.toLowerCase()
   return mappedLocations.value.filter(l => l.nama.toLowerCase().includes(q) || (l.petugas && l.petugas.toLowerCase().includes(q)))
 })
 
+// Filter List Pencarian Arsip (Disesuaikan menggunakan no_polisi)
 const filteredArsip = computed(() => {
   if (!searchQueryArsip.value) return arsipStore.arsipList
-  return arsipStore.arsipList.filter(a => a.nopol && a.nopol.toLowerCase().includes(searchQueryArsip.value.toLowerCase()))
+  return arsipStore.arsipList.filter(a => a.no_polisi && a.no_polisi.toLowerCase().includes(searchQueryArsip.value.toLowerCase()))
 })
 
 const rutePerusahaan = computed(() => ruteStore.lokasiList.filter(r => (!r.kategori || r.kategori === 'Perusahaan')).length)
 const rutePribadi = computed(() => ruteStore.lokasiList.filter(r => r.kategori === 'Pribadi').length)
+
+// === IMPORT DAN EXPORT CSV ARSIP LOGIC ===
+function triggerImportArsip() {
+  if (fileInputArsip.value) fileInputArsip.value.click()
+}
+
+function exportCSVArsip() {
+  if (arsipStore.arsipList.length === 0) return alert("Tidak ada data arsip untuk diekspor")
+
+  let csvContent = "Nomor Surat,No Polisi,Status,Nama Box\n"
+  arsipStore.arsipList.forEach(row => {
+    // Escape string agar aman di CSV
+    const escapeCSV = (str) => {
+      if (!str) return ''
+      return `"${String(str).replace(/"/g, '""')}"`
+    }
+    csvContent += `${row.no_surat},${escapeCSV(row.no_polisi)},${escapeCSV(row.status)},${escapeCSV(row.nama_box)}\n`
+  })
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement("a")
+  link.setAttribute("href", URL.createObjectURL(blob))
+  link.setAttribute("download", `Data_Arsip_${new Date().toISOString().slice(0,10)}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+async function importCSVArsip(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const text = e.target.result
+    const rows = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0)
+
+    if (rows.length < 2) {
+      alert("File CSV kosong atau format tidak valid")
+      return
+    }
+
+    arsipStore.loading = true
+    try {
+      let batch = writeBatch(db)
+      let count = 0
+      let totalImported = 0
+
+      // Mulai iterasi dari baris ke-1 (melewati header di baris ke-0)
+      for (let i = 1; i < rows.length; i++) {
+        // Logika split CSV memisahkan nilai dalam tanda kutip (")
+        const cols = rows[i].split(',').map(col => col.replace(/(^"|"$)/g, '').trim())
+
+        if (cols.length >= 2) {
+          const docId = "ARSIP-IMP-" + Date.now() + "-" + i
+          const docRef = doc(db, 'artifacts', 'SatriaApp', 'public', 'data', 'arsip', docId)
+
+          batch.set(docRef, {
+            no_surat: parseInt(cols[0]) || 0,
+            no_polisi: (cols[1] || '').toUpperCase(),
+            status: cols[2] || 'Tersedia',
+            nama_box: cols[3] || '',
+            id_admin: localStorage.getItem('userId') || 'MIGRASI',
+            nama_admin: localStorage.getItem('nama') || 'Admin',
+            created_at: new Date().toISOString()
+          })
+
+          count++
+          totalImported++
+
+          // Firestore Batch limit adalah 500, kita batasi per 400 dokumen per operasi
+          if (count === 400) {
+            await batch.commit()
+            batch = writeBatch(db) // Buat batch baru
+            count = 0
+          }
+        }
+      }
+
+      // Kirim sisa data yang belum mencapai 400
+      if (count > 0) await batch.commit()
+
+      await arsipStore.loadArsip() // Refresh tampilan setelah selesai
+      alert(`${totalImported} data arsip berhasil diimpor!`)
+    } catch(err) {
+      console.error("Gagal mengimpor CSV", err)
+      alert("Terjadi error saat memproses file CSV.")
+    } finally {
+      arsipStore.loading = false
+      if (fileInputArsip.value) fileInputArsip.value.value = ''
+    }
+  }
+  reader.readAsText(file)
+}
+
 
 // Watcher panel toggle untuk refresh ukuran Leaflet Map
 watch(isPanelOpen, () => {

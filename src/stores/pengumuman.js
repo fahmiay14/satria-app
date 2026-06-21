@@ -15,10 +15,17 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
     loading.value = true
     try {
       const snapshot = await getDocs(collection(db, ...pengumumanPath))
-      const rawData = snapshot.docs.map(docu => ({
-        id: docu.id,
-        ...docu.data()
-      }))
+      const rawData = snapshot.docs.map(docu => {
+        const data = docu.data()
+        return {
+          id: docu.id,
+          judul: data.judul || '',
+          isi: data.isi || '',
+          penting: data.status === 'Penting' || data.penting === true,
+          pembuat: data.nama_admin || data.pembuat || '',
+          tanggal: data.tanggal || ''
+        }
+      })
 
       // Urutkan dari yang terbaru (Descending)
       rawData.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())
@@ -35,11 +42,13 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
   async function savePengumuman(data) {
     loading.value = true
     try {
+      // === PAYLOAD SESUAI STRUKTUR ERD ===
       const payload = {
         judul: data.judul,
         isi: data.isi,
-        penting: data.penting || false,
-        pembuat: data.pembuat || localStorage.getItem('nama'),
+        status: data.penting ? 'Penting' : 'Biasa',
+        id_admin: localStorage.getItem('userId') || '',
+        nama_admin: localStorage.getItem('nama') || 'Admin',
         tanggal: data.tanggal || new Date().toISOString()
       }
 
