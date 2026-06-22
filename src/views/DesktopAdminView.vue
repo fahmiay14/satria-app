@@ -8,6 +8,7 @@
         class="flex flex-row shrink-0 overflow-hidden transition-all duration-300 ease-in-out z-20 shadow-2xl"
         :class="isPanelOpen ? 'w-[706px]' : 'w-0'"
       >
+        <!-- STREAMING_CHUNK:Rendering Sidebar Kiri... -->
         <!-- SIDEBAR KIRI: NAVIGASI UTAMA DESKTOP -->
         <div class="w-64 border-r flex flex-col justify-between shrink-0 transition-colors duration-300" :class="theme.sidebarBg">
           <div>
@@ -82,6 +83,7 @@
           </div>
         </div>
 
+        <!-- STREAMING_CHUNK:Rendering Panel Konten... -->
         <!-- KONTEN DINAMIS -->
         <div class="w-[450px] border-r flex flex-col shrink-0 transition-colors duration-300" :class="theme.panelBg">
 
@@ -94,7 +96,8 @@
               <p class="text-[11px] mt-0.5 transition-colors" :class="theme.textMuted">Periode Bulan Ini: {{ currentMonthLabel }}</p>
             </div>
 
-            <button v-if="activeMenu === 'arsip'" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition">
+            <!-- Tombol Tambah yang sudah dipasangkan dengan modal -->
+            <button v-if="activeMenu === 'arsip'" @click="showTambahModal = true" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition cursor-pointer">
               <span class="material-symbols-outlined text-sm">add</span> Tambah
             </button>
           </div>
@@ -142,6 +145,7 @@
               </div>
             </div>
 
+            <!-- STREAMING_CHUNK:Rendering Sub Panel Arsip... -->
             <!-- 2. SUB PANEL: DATA ARSIP -->
             <div v-if="activeMenu === 'arsip'" class="space-y-4">
               <!-- Aksi Import/Export Arsip -->
@@ -180,6 +184,7 @@
               </div>
             </div>
 
+            <!-- STREAMING_CHUNK:Rendering Sub Panel Statistik... -->
             <!-- 3. SUB PANEL: STATISTIK -->
             <div v-if="activeMenu === 'statistik'" class="space-y-5">
               <div class="border rounded-xl p-4 transition-colors duration-300" :class="theme.cardBg">
@@ -209,8 +214,9 @@
                 </div>
               </div>
 
-              <button @click="exportGlobalLaporan" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow text-xs flex justify-center items-center gap-2 transition active:scale-95">
-                <span class="material-symbols-outlined text-sm">print</span> DOWNLOAD EXCEL REKAP BULANAN
+              <!-- TOMBOL CETAK POP-UP -->
+              <button @click="showCetakModal = true" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow text-xs flex justify-center items-center gap-2 transition active:scale-95">
+                <span class="material-symbols-outlined text-sm">print</span> CETAK LAPORAN PENELUSURAN
               </button>
             </div>
 
@@ -218,6 +224,7 @@
         </div>
       </div>
 
+      <!-- STREAMING_CHUNK:Rendering Peta Monitoring... -->
       <!-- KANAN: PETA MONITORING INTERAKTIF -->
       <div class="flex-1 h-full relative flex flex-col overflow-hidden transition-colors duration-300" :class="theme.mapBg">
 
@@ -291,14 +298,110 @@
             </div>
           </div>
         </div>
-
       </div>
 
+    </div>
+
+    <!-- STREAMING_CHUNK:Rendering Modals... -->
+    <!-- MODAL CETAK LAPORAN PENELUSURAN -->
+    <div v-if="showCetakModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity bg-black/40 backdrop-blur-sm" @click.self="showCetakModal = false">
+      <div class="rounded-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up" :class="theme.cardBg">
+
+        <div class="px-6 py-4 border-b flex justify-between items-center shrink-0" :class="theme.border">
+          <h3 class="text-lg font-bold" :class="theme.textMain">Cetak Laporan Penelusuran</h3>
+          <button @click="showCetakModal = false" class="text-gray-400 hover:text-red-500 transition"><span class="material-symbols-outlined">close</span></button>
+        </div>
+
+        <div class="p-6">
+          <form @submit.prevent="executeCetakLaporan" class="space-y-4">
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Bulan</label>
+                <select v-model="cetakMonth" required class="w-full border rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" :class="theme.inputBg">
+                  <option v-for="(m, i) in monthNames" :key="m" :value="i">{{ m }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Tahun</label>
+                <select v-model="cetakYear" required class="w-full border rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" :class="theme.inputBg">
+                  <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Pilih Petugas</label>
+              <select v-model="cetakPetugas" required class="w-full border rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" :class="theme.inputBg">
+                <option value="Semua Petugas">Semua Petugas (Gabungan)</option>
+                <option v-for="p in ruteStore.petugasList" :key="p.id" :value="p.nama">{{ p.nama }}</option>
+              </select>
+            </div>
+
+            <div class="pt-4 pb-2">
+              <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 text-sm flex justify-center items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">print</span>
+                Buat Dokumen Laporan
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL TAMBAH ARSIP -->
+    <div v-if="showTambahModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity bg-black/40 backdrop-blur-sm" @click.self="showTambahModal = false">
+      <div class="rounded-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up" :class="theme.cardBg">
+
+        <div class="px-6 py-4 border-b flex justify-between items-center shrink-0" :class="theme.border">
+          <h3 class="text-lg font-bold" :class="theme.textMain">Tambah Data Arsip</h3>
+          <button @click="showTambahModal = false" class="text-gray-400 hover:text-red-500 transition"><span class="material-symbols-outlined">close</span></button>
+        </div>
+
+        <div class="p-6">
+          <form @submit.prevent="submitTambahArsip" class="space-y-4">
+
+            <div>
+              <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Nomor Surat</label>
+              <input v-model="formArsip.no_surat" type="number" required class="w-full border rounded-xl px-3 py-3 outline-none text-sm font-medium focus:ring-2 focus:ring-blue-500 transition-colors" :class="theme.inputBg" placeholder="Contoh: 1234" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Nomor Polisi</label>
+              <input v-model="formArsip.no_polisi" type="text" required class="w-full border rounded-xl px-3 py-3 outline-none text-sm font-medium uppercase focus:ring-2 focus:ring-blue-500 transition-colors" :class="theme.inputBg" placeholder="Contoh: B 1234 KAA" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Status</label>
+                <select v-model="formArsip.status" class="w-full border rounded-xl px-3 py-3 outline-none text-sm font-medium focus:ring-2 focus:ring-blue-500 transition-colors" :class="theme.inputBg">
+                  <option value="Tersedia">Tersedia</option>
+                  <option value="Dipinjam">Dipinjam</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold mb-1.5 uppercase tracking-wide" :class="theme.textSub">Nama Box</label>
+                <input v-model="formArsip.nama_box" type="text" class="w-full border rounded-xl px-3 py-3 outline-none text-sm font-medium focus:ring-2 focus:ring-blue-500 transition-colors" :class="theme.inputBg" placeholder="Contoh: Box A1" />
+              </div>
+            </div>
+
+            <div class="pt-4 pb-2">
+              <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 text-sm flex justify-center items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">save</span>
+                Simpan Arsip
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+/* STREAMING_CHUNK:Initializing Imports... */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRuteStore } from '../stores/rute'
@@ -307,8 +410,8 @@ import { useArsipStore } from '../stores/arsip'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Tambahan import Firebase agar Import CSV berjalan
-import { writeBatch, doc } from 'firebase/firestore'
+// Firebase Import (Ditambahkan setDoc dan collection untuk fitur Tambah)
+import { writeBatch, doc, setDoc, collection } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
 const router = useRouter()
@@ -316,6 +419,7 @@ const ruteStore = useRuteStore()
 const laporanStore = useLaporanStore()
 const arsipStore = useArsipStore()
 
+/* STREAMING_CHUNK:Defining State Variables... */
 // State Layout & Tema
 const isPanelOpen = ref(true)
 const isDarkMode = ref(localStorage.getItem('theme') !== 'light') // Default Dark Mode
@@ -325,11 +429,36 @@ const searchQueryArsip = ref('')
 const today = new Date()
 const activeNotifications = ref([]) // State untuk Pop-up Notifikasi Melayang
 
-const fileInputArsip = ref(null) // Referensi DOM untuk input file CSV Arsip
-
+const fileInputArsip = ref(null)
 const currentAdmin = localStorage.getItem('nama') || 'ADMINISTRATOR'
 
-// === OBJECT THEME: Kontrol warna absolute berbasis JavaScript ===
+// === DATA DAN STATE POP-UP CETAK LAPORAN ===
+const showCetakModal = ref(false)
+const cetakMonth = ref(today.getMonth())
+const cetakYear = ref(today.getFullYear())
+const cetakPetugas = ref('Semua Petugas')
+const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+
+const yearOptions = computed(() => {
+  const currentY = new Date().getFullYear()
+  const years = []
+  for (let i = currentY - 5; i <= currentY + 5; i++) {
+    years.push(i)
+  }
+  return years
+})
+
+// === DATA DAN STATE POP-UP TAMBAH ARSIP ===
+const showTambahModal = ref(false)
+const formArsip = ref({
+  no_surat: '',
+  no_polisi: '',
+  status: 'Tersedia',
+  nama_box: ''
+})
+
+/* STREAMING_CHUNK:Configuring Theme... */
+// === OBJECT THEME ===
 const theme = computed(() => isDarkMode.value ? {
   appBg: 'bg-slate-900 text-slate-100',
   sidebarBg: 'bg-slate-950 border-slate-800',
@@ -362,7 +491,6 @@ const theme = computed(() => isDarkMode.value ? {
   legendNumber: 'bg-slate-950 border-slate-800',
   liveBadgeBg: 'bg-slate-900/90 border-slate-700',
   liveBadgeText: 'text-white',
-  // Notifikasi Dark Theme
   notifSuccessBg: 'bg-slate-800 border-green-500',
   notifSuccessIconBg: 'bg-green-900/40 text-green-400',
   notifErrorBg: 'bg-slate-800 border-red-500',
@@ -403,7 +531,6 @@ const theme = computed(() => isDarkMode.value ? {
   legendNumber: 'bg-white border-gray-200',
   liveBadgeBg: 'bg-white/90 border-gray-300',
   liveBadgeText: 'text-gray-800',
-  // Notifikasi Light Theme
   notifSuccessBg: 'bg-white border-green-500',
   notifSuccessIconBg: 'bg-green-100 text-green-600',
   notifErrorBg: 'bg-white border-red-500',
@@ -414,18 +541,14 @@ const theme = computed(() => isDarkMode.value ? {
   notifTextHighlight2: 'text-gray-700',
 })
 
-// Helper Bulan format text
-const currentMonthLabel = computed(() => {
-  const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
-  return `${monthNames[today.getMonth()]} ${today.getFullYear()}`
-})
+const currentMonthLabel = computed(() => `${monthNames[today.getMonth()]} ${today.getFullYear()}`)
 const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-// Map instance
 let map = null
 let markersGroup = null
 let tileLayer = null
 
+/* STREAMING_CHUNK:Loading Lifecycle... */
 onMounted(async () => {
   await Promise.all([
     ruteStore.loadPetugas(),
@@ -458,52 +581,36 @@ function setMapTheme() {
   tileLayer = L.tileLayer(url, { attribution: '&copy; CartoDB' }).addTo(map)
 }
 
-// === CORE LOGIC & PENDETEKSI NOTIFIKASI REAL-TIME ===
-
-// Fungsi menampilkan Notifikasi UI
+/* STREAMING_CHUNK:Configuring Realtime Notifications... */
+// === PENDETEKSI NOTIFIKASI REAL-TIME ===
 function addNotification(report) {
   const notifId = Date.now() + Math.random()
   activeNotifications.value.push({ ...report, _notifId: notifId })
-
-  // Hapus otomatis setelah 5 Detik
   setTimeout(() => {
     activeNotifications.value = activeNotifications.value.filter(n => n._notifId !== notifId)
   }, 5000)
 }
 
-// Watcher Pintar untuk mendeteksi datangnya laporan baru di Firebase
 let isFirstLoad = true
 let lastReportId = null
 
 watch(() => laporanStore.laporanList, (newVal) => {
   if (!newVal || newVal.length === 0) return
+  if (isFirstLoad) { lastReportId = newVal[0].id; isFirstLoad = false; return }
 
-  // Abaikan saat pertama kali memuat daftar puluhan/ratusan laporan agar tidak banjir notif
-  if (isFirstLoad) {
-    lastReportId = newVal[0].id
-    isFirstLoad = false
-    return
-  }
-
-  // Jika ID laporan paling atas berbeda, berarti ada Laporan Baru masuk!
   if (newVal[0].id !== lastReportId) {
     const newReports = []
     for (const report of newVal) {
       if (report.id === lastReportId) break
       newReports.push(report)
     }
-
-    // Tampilkan notifikasi melayang
-    newReports.reverse().forEach(report => {
-      addNotification(report)
-    })
-
+    newReports.reverse().forEach(report => { addNotification(report) })
     lastReportId = newVal[0].id
   }
 }, { deep: true })
 
 
-// Pematakan Data ke UI
+// === PEMETAAN DATA ===
 const mappedLocations = computed(() => {
   const perusahaanList = ruteStore.lokasiList.filter(l => (!l.kategori || l.kategori === 'Perusahaan'))
   return perusahaanList.map(loc => {
@@ -517,7 +624,6 @@ const mappedLocations = computed(() => {
 const totalLocations = computed(() => mappedLocations.value.length)
 const completedCount = computed(() => mappedLocations.value.filter(l => l.isCompleted).length)
 
-// Kalkulasi Progress (Target vs Selesai) untuk Grid Bawah
 const petugasStats = computed(() => {
   return ruteStore.petugasList.map(p => {
     const locs = mappedLocations.value.filter(l => l.petugas === p.nama)
@@ -533,14 +639,12 @@ const petugasStats = computed(() => {
   }).filter(p => p.target > 0)
 })
 
-// Filter List Pencarian Monitoring
 const filteredLocations = computed(() => {
   if (!searchQuery.value) return mappedLocations.value
   const q = searchQuery.value.toLowerCase()
   return mappedLocations.value.filter(l => l.nama.toLowerCase().includes(q) || (l.petugas && l.petugas.toLowerCase().includes(q)))
 })
 
-// Filter List Pencarian Arsip (Disesuaikan menggunakan no_polisi)
 const filteredArsip = computed(() => {
   if (!searchQueryArsip.value) return arsipStore.arsipList
   return arsipStore.arsipList.filter(a => a.no_polisi && a.no_polisi.toLowerCase().includes(searchQueryArsip.value.toLowerCase()))
@@ -549,7 +653,9 @@ const filteredArsip = computed(() => {
 const rutePerusahaan = computed(() => ruteStore.lokasiList.filter(r => (!r.kategori || r.kategori === 'Perusahaan')).length)
 const rutePribadi = computed(() => ruteStore.lokasiList.filter(r => r.kategori === 'Pribadi').length)
 
-// === IMPORT DAN EXPORT CSV ARSIP LOGIC ===
+
+/* STREAMING_CHUNK:Configuring CSV Logic... */
+// === IMPORT & EXPORT CSV ARSIP ===
 function triggerImportArsip() {
   if (fileInputArsip.value) fileInputArsip.value.click()
 }
@@ -559,7 +665,6 @@ function exportCSVArsip() {
 
   let csvContent = "Nomor Surat,No Polisi,Status,Nama Box\n"
   arsipStore.arsipList.forEach(row => {
-    // Escape string agar aman di CSV
     const escapeCSV = (str) => {
       if (!str) return ''
       return `"${String(str).replace(/"/g, '""')}"`
@@ -596,10 +701,9 @@ async function importCSVArsip(event) {
       let count = 0
       let totalImported = 0
 
-      // Mulai iterasi dari baris ke-1 (melewati header di baris ke-0)
       for (let i = 1; i < rows.length; i++) {
-        // Logika split CSV memisahkan nilai dalam tanda kutip (")
-        const cols = rows[i].split(',').map(col => col.replace(/(^"|"$)/g, '').trim())
+        // [PERBAIKAN]: Memisahkan kolom berdasarkan koma ATAU titik koma
+        const cols = rows[i].split(/[,;]/).map(col => col.replace(/(^"|"$)/g, '').trim())
 
         if (cols.length >= 2) {
           const docId = "ARSIP-IMP-" + Date.now() + "-" + i
@@ -618,19 +722,15 @@ async function importCSVArsip(event) {
           count++
           totalImported++
 
-          // Firestore Batch limit adalah 500, kita batasi per 400 dokumen per operasi
           if (count === 400) {
             await batch.commit()
-            batch = writeBatch(db) // Buat batch baru
+            batch = writeBatch(db)
             count = 0
           }
         }
       }
-
-      // Kirim sisa data yang belum mencapai 400
       if (count > 0) await batch.commit()
-
-      await arsipStore.loadArsip() // Refresh tampilan setelah selesai
+      await arsipStore.loadArsip()
       alert(`${totalImported} data arsip berhasil diimpor!`)
     } catch(err) {
       console.error("Gagal mengimpor CSV", err)
@@ -643,8 +743,185 @@ async function importCSVArsip(event) {
   reader.readAsText(file)
 }
 
+/* STREAMING_CHUNK:Configuring Submit Logic... */
+// === FUNGSI TAMBAH ARSIP BARU ===
+async function submitTambahArsip() {
+  try {
+    const colRef = collection(db, 'artifacts', 'SatriaApp', 'public', 'data', 'arsip')
+    const newDocRef = doc(colRef) // Generate ID otomatis
 
-// Watcher panel toggle untuk refresh ukuran Leaflet Map
+    await setDoc(newDocRef, {
+      no_surat: parseInt(formArsip.value.no_surat) || 0,
+      no_polisi: formArsip.value.no_polisi.toUpperCase(),
+      status: formArsip.value.status,
+      nama_box: formArsip.value.nama_box || '',
+      id_admin: localStorage.getItem('userId') || 'MANUAL',
+      nama_admin: currentAdmin,
+      created_at: new Date().toISOString()
+    })
+
+    alert("Data arsip baru berhasil ditambahkan!")
+    showTambahModal.value = false // Tutup modal
+
+    // Reset form ke keadaan semula
+    formArsip.value = { no_surat: '', no_polisi: '', status: 'Tersedia', nama_box: '' }
+
+    // Tarik ulang data terbaru dari store
+    await arsipStore.loadArsip()
+  } catch (error) {
+    console.error("Gagal menambah arsip:", error)
+    alert("Terjadi kesalahan saat menyimpan data.")
+  }
+}
+
+// === FUNGSI CETAK LAPORAN PENELUSURAN DINAMIS (PDF) ===
+function executeCetakLaporan() {
+  const periodeStr = `${cetakYear.value}-${String(cetakMonth.value + 1).padStart(2, '0')}`
+  const periodeText = `${monthNames[cetakMonth.value]} ${cetakYear.value}`
+
+  // 1. Filter laporan berdasarkan bulan & tahun yang dipilih
+  let dataFilter = laporanStore.laporanList.filter(r => r.date && r.date.startsWith(periodeStr))
+
+  // 2. Filter berdasarkan petugas (jika bukan 'Semua Petugas')
+  if (cetakPetugas.value !== 'Semua Petugas') {
+    dataFilter = dataFilter.filter(r => r.petugas === cetakPetugas.value)
+  }
+
+  if (dataFilter.length === 0) {
+    alert('Tidak ada laporan untuk periode dan petugas tersebut yang bisa dicetak.')
+    return
+  }
+
+  const totalObjek = dataFilter.length
+  let baik = 0
+  let bermasalah = 0
+  let tableRows = ''
+
+  // 3. Proses baris tabel
+  dataFilter.forEach((r, idx) => {
+    const status = r.status || 'Telah Dikunjungi'
+    let kondisi = r.catatan ? r.catatan : 'Berfungsi dengan baik'
+
+    const catLow = kondisi.toLowerCase()
+    if (status === 'Terjadi Masalah' || catLow.includes('rusak') || catLow.includes('tidak berfungsi') || catLow.includes('masalah')) {
+      bermasalah++
+    } else {
+      baik++
+    }
+
+    tableRows += `
+      <tr>
+        <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 12px; color: #000;">${idx + 1}</td>
+        <td style="border: 1px solid #000; padding: 8px; font-size: 12px; color: #000;">${r.perusahaan}</td>
+        <td style="border: 1px solid #000; padding: 8px; font-size: 12px; color: #000;">${status}</td>
+        <td style="border: 1px solid #000; padding: 8px; font-size: 12px; color: #000;">${kondisi}</td>
+      </tr>
+    `
+  })
+
+  // 4. Susun Paragraf Kesimpulan
+  const kesimpulanTambahan = bermasalah > 0
+    ? ' Pelaksanaan kunjungan berjalan tanpa kendala berarti. Namun, objek dengan water meter rusak atau tidak berfungsi perlu menjadi prioritas evaluasi, terutama untuk memastikan validitas data pengukuran dan keberlanjutan pemantauan pajak meter air permukaan.'
+    : ' Pelaksanaan kunjungan berjalan tanpa kendala berarti dan seluruh water meter dalam kondisi optimal.'
+
+  const kesimpulan = `Berdasarkan hasil penelusuran, petugas telah melakukan kunjungan ke ${totalObjek} perusahaan yang telah ditugaskan. Seluruh objek tercatat telah dikunjungi. Dari hasil pemeriksaan kondisi water meter, terdapat ${baik} water meter berfungsi dengan baik dan ${bermasalah} water meter memerlukan tindak lanjut.${kesimpulanTambahan}`
+
+  const namaPenandatangan = cetakPetugas.value === 'Semua Petugas' ? currentAdmin : cetakPetugas.value
+  const labelPenandatangan = cetakPetugas.value === 'Semua Petugas' ? 'Administrator' : 'Petugas Penelusuran'
+
+  // 5. Susun Template Kertas HTML (A4 Portrait)
+  const html = `
+    <div style="text-align: center; margin-bottom: 25px;">
+      <h2 style="font-size: 16px; font-weight: bold; margin: 0; text-decoration: underline; color: #000;">LAPORAN PETUGAS PENELUSURAN</h2>
+      <h2 style="font-size: 16px; font-weight: bold; margin: 5px 0 0 0; color: #000;">PAJAK METER AIR PERMUKAAN</h2>
+    </div>
+
+    <table style="width: 100%; font-size: 12px; margin-bottom: 25px; border: none; color: #000;">
+      <tr>
+        <td style="width: 15%; padding: 4px 0;">Jenis Laporan</td>
+        <td style="width: 2%; padding: 4px 0;">:</td>
+        <td style="width: 43%; padding: 4px 0;">Penelusuran dan evaluasi kondisi water meter</td>
+        <td style="width: 10%; padding: 4px 0;">Objek</td>
+        <td style="width: 2%; padding: 4px 0;">:</td>
+        <td style="width: 28%; padding: 4px 0;">Perusahaan/PDAM</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 0;">Periode</td>
+        <td style="padding: 4px 0;">:</td>
+        <td style="padding: 4px 0;">${periodeText}</td>
+        <td style="padding: 4px 0;">Total Objek</td>
+        <td style="padding: 4px 0;">:</td>
+        <td style="padding: 4px 0;">${totalObjek} Perusahaan</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 0;">Petugas</td>
+        <td style="padding: 4px 0;">:</td>
+        <td style="padding: 4px 0;" colspan="4">${cetakPetugas.value}</td>
+      </tr>
+    </table>
+
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+      <thead>
+        <tr style="background-color: #f3f4f6;">
+          <th style="border: 1px solid #000; padding: 8px; font-size: 12px; text-align: center; width: 5%; color: #000;">No</th>
+          <th style="border: 1px solid #000; padding: 8px; font-size: 12px; text-align: left; width: 35%; color: #000;">Nama Perusahaan</th>
+          <th style="border: 1px solid #000; padding: 8px; font-size: 12px; text-align: left; width: 20%; color: #000;">Status</th>
+          <th style="border: 1px solid #000; padding: 8px; font-size: 12px; text-align: left; width: 40%; color: #000;">Kondisi Water Meter</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+
+    <div style="font-size: 12px; margin-bottom: 50px; text-align: justify; line-height: 1.6; color: #000;">
+      <strong style="color: #000;">Kesimpulan</strong><br>
+      ${kesimpulan}
+    </div>
+
+    <table style="width: 100%; border: none; margin-top: 30px; color: #000;">
+      <tr>
+        <td style="width: 60%;"></td>
+        <td style="width: 40%; text-align: center; font-size: 12px;">
+          <p style="margin-bottom: 70px;">${labelPenandatangan},</p>
+          <p style="font-weight: bold; text-decoration: underline; margin: 0;">${namaPenandatangan}</p>
+        </td>
+      </tr>
+    </table>
+  `
+
+  // 6. Eksekusi Print via Iframe
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0'
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentWindow.document
+  doc.open()
+  doc.write(`
+    <html>
+    <head>
+      <title>Laporan_Penelusuran_${periodeText.replace(' ', '_')}</title>
+      <style>
+        @page { size: A4 portrait; margin: 20mm; }
+        body { font-family: 'Times New Roman', Times, serif; color: #000; background: #fff; margin: 0; }
+      </style>
+    </head>
+    <body>${html}</body>
+    </html>
+  `)
+  doc.close()
+
+  setTimeout(() => {
+    iframe.contentWindow.focus()
+    iframe.contentWindow.print()
+    setTimeout(() => document.body.removeChild(iframe), 1000)
+    showCetakModal.value = false // Tutup modal setelah jendela cetak muncul
+  }, 500)
+}
+
+/* STREAMING_CHUNK:Configuring Map Engine... */
+// === MAP RENDERING ENGINE ===
 watch(isPanelOpen, () => {
   let count = 0
   const interval = setInterval(() => {
@@ -656,17 +933,20 @@ watch(isPanelOpen, () => {
 
 watch(mappedLocations, () => { renderMarkers() }, { deep: true })
 
-// === MAPS RENDERING ENGINE ===
 function initMap() {
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  });
+
   map = L.map('mapDesktop', { zoomControl: true }).setView([-6.27, 107.14], 12)
   setMapTheme()
 
   markersGroup = L.layerGroup().addTo(map)
   renderMarkers()
 
-  setTimeout(() => {
-    if(map) map.invalidateSize()
-  }, 300)
+  setTimeout(() => { if(map) map.invalidateSize() }, 300)
 }
 
 function createDesktopIcon(color, isCompleted) {
@@ -731,13 +1011,10 @@ function handleLogout() {
   localStorage.clear()
   router.push('/login')
 }
-
-function exportGlobalLaporan() {
-  alert("Menyiapkan dokumen rekap komprehensif format .xlsx untuk diunduh.")
-}
 </script>
 
 <style scoped>
+/* STREAMING_CHUNK:Applying CSS... */
 /* Transisi scrollbar kustom bertema gelap/terang untuk desktop */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -756,12 +1033,13 @@ function exportGlobalLaporan() {
 
 /* Animasi Notifikasi Melayang (Pop-up Real-Time) */
 .slide-left-enter-active,
-.slide-left-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
+.slide-left-leave-active { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .slide-left-enter-from,
-.slide-left-leave-to {
-  opacity: 0;
-  transform: translateX(50px);
+.slide-left-leave-to { opacity: 0; transform: translateX(50px); }
+
+.animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes slideUp {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
 }
 </style>
