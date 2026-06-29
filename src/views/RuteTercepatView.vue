@@ -19,10 +19,13 @@
         </div>
 
         <form @submit.prevent="kalkulasiRute" class="space-y-4">
-          <!-- Pilih Petugas -->
+          <!-- Pilih Petugas (Logika Admin vs Petugas) -->
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">1. Pilih Petugas</label>
+
+            <!-- Jika Admin, Tampilkan Dropdown -->
             <select
+              v-if="role === 'admin'"
               v-model="selectedPetugas"
               required
               class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm bg-white font-medium"
@@ -30,6 +33,16 @@
               <option value="" disabled>-- Pilih Petugas --</option>
               <option v-for="p in store.petugasList" :key="p.id" :value="p.nama">{{ p.nama }}</option>
             </select>
+
+            <!-- Jika Petugas, Tampilkan Input Readonly Terkunci -->
+            <input
+              v-else
+              type="text"
+              v-model="selectedPetugas"
+              readonly
+              class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-gray-100 text-gray-500 outline-none text-sm font-bold cursor-not-allowed"
+            >
+            <p v-if="role !== 'admin'" class="text-[10px] text-gray-400 mt-1.5">*Anda hanya dapat membuat rute untuk jadwal Anda sendiri.</p>
           </div>
 
           <!-- Titik Awal -->
@@ -67,7 +80,7 @@
         </div>
 
         <p class="text-[11px] text-gray-500 mb-4">
-          Ditemukan <span class="font-bold text-gray-800">{{ resultRoute.length }} titik lokasi</span> untuk {{ selectedPetugas }}.
+          Ditemukan <span class="font-bold text-gray-800">{{ resultRoute.length }} titik lokasi perusahaan</span> untuk {{ selectedPetugas }}.
         </p>
 
         <!-- Link Result -->
@@ -116,11 +129,11 @@
 
       </div>
 
-      <!-- Jika Petugas tidak punya tugas -->
+      <!-- Jika Petugas tidak punya tugas perusahaan -->
       <div v-if="hasCalculated && (!resultRoute || resultRoute.length === 0)" class="bg-red-50 rounded-2xl p-5 border border-red-200 text-center animate-slide-up">
         <span class="material-symbols-outlined text-3xl text-red-400 mb-2">error</span>
-        <p class="text-sm font-bold text-red-800">Tidak ada lokasi!</p>
-        <p class="text-xs text-red-600 mt-1">Petugas ini belum memiliki tugas kunjungan perusahaan.</p>
+        <p class="text-sm font-bold text-red-800">Tidak ada lokasi perusahaan!</p>
+        <p class="text-xs text-red-600 mt-1">Petugas ini belum memiliki penugasan rute untuk kategori perusahaan.</p>
       </div>
 
     </div>
@@ -135,6 +148,10 @@ import { useRuteStore } from '../stores/rute'
 const router = useRouter()
 const store = useRuteStore()
 
+// State Identitas Pengguna Login
+const role = localStorage.getItem('role') || 'petugas'
+const currentUserName = localStorage.getItem('nama') || 'PENGGUNA'
+
 const selectedPetugas = ref('')
 const startCoord = ref('-6.270080679426531, 107.1481756927926') // Default Kantor Samsat
 const isCalculating = ref(false)
@@ -146,6 +163,11 @@ const resultLink = ref('')
 onMounted(() => {
   store.loadLokasi()
   store.loadPetugas()
+
+  // Jika role adalah petugas, otomatis pilih namanya sendiri
+  if (role !== 'admin') {
+    selectedPetugas.value = currentUserName
+  }
 })
 
 // === ALGORITMA HAVERSINE DISTANCE ===
@@ -175,7 +197,11 @@ function kalkulasiRute() {
     const sLat = parseFloat(startParts[0].trim())
     const sLng = parseFloat(startParts[1].trim())
 
-    const unvisited = store.lokasiList.filter(l => l.petugas === selectedPetugas.value)
+    // FIlTER: Hanya mengambil lokasi milik petugas terpilih DAN merupakan 'Perusahaan'
+    const unvisited = store.lokasiList.filter(l =>
+      l.petugas === selectedPetugas.value &&
+      (!l.kategori || l.kategori === 'Perusahaan')
+    )
 
     if (unvisited.length === 0) {
       resultRoute.value = []
@@ -223,7 +249,6 @@ function kalkulasiRute() {
 
 function bukaLinkMaps() {
   if (!resultLink.value) return
-  // Langsung membuka link di tab/aplikasi baru
   window.open(resultLink.value, '_blank')
 }
 </script>

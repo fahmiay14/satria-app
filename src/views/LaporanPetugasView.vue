@@ -49,40 +49,57 @@
     <!-- DAFTAR LAPORAN HARIAN -->
     <div class="flex-1 overflow-y-auto px-5 pt-5 pb-24 relative bg-gray-50">
 
-      <div class="flex items-center justify-between mb-4 sticky top-0 bg-gray-50/90 backdrop-blur-sm py-2 z-10">
-        <h3 class="font-bold text-gray-800 text-sm">
-          Laporan: <span class="text-[#10499b]">{{ formatSelectedDate }}</span>
-        </h3>
-        <span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-lg">
-          {{ reportsForSelectedDate.length }} Laporan
-        </span>
+      <!-- STICKY HEADER & FILTER VERIFIKASI -->
+      <div class="sticky top-0 bg-gray-50/95 backdrop-blur-sm pt-2 pb-3 z-10 border-b border-gray-100 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-gray-800 text-sm">
+            Laporan: <span class="text-[#10499b]">{{ formatSelectedDate }}</span>
+          </h3>
+          <span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-lg">
+            {{ reportsForSelectedDate.length }} Laporan
+          </span>
+        </div>
+
+        <!-- TAB FILTER STATUS VERIFIKASI -->
+        <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+          <button @click="filterVerifikasi = 'Semua'" :class="filterVerifikasi === 'Semua' ? 'bg-[#10499b] text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'" class="px-3.5 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition">Semua</button>
+          <button @click="filterVerifikasi = 'Belum'" :class="filterVerifikasi === 'Belum' ? 'bg-gray-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'" class="px-3.5 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition">Belum Diverifikasi</button>
+          <button @click="filterVerifikasi = 'Disetujui'" :class="filterVerifikasi === 'Disetujui' ? 'bg-green-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'" class="px-3.5 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition">Disetujui</button>
+          <button @click="filterVerifikasi = 'Ditolak'" :class="filterVerifikasi === 'Ditolak' ? 'bg-red-600 text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'" class="px-3.5 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap transition">Ditolak</button>
+        </div>
       </div>
 
-      <div v-if="reportsForSelectedDate.length > 0" class="space-y-3">
+      <div v-if="reportsForSelectedDate.length > 0" class="space-y-4">
         <div
           v-for="item in reportsForSelectedDate"
           :key="item.id"
           class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm relative overflow-hidden group"
         >
-          <!-- Indikator Status Kiri -->
+          <!-- Indikator Kunjungan Kiri -->
           <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="item.status === 'Telah Dikunjungi' ? 'bg-green-500' : 'bg-red-500'"></div>
 
-          <div class="flex justify-between items-start mb-2">
-            <div class="flex-1 min-w-0 pr-2">
+          <!-- Badge Status Verifikasi di Kanan Atas -->
+          <div class="absolute top-0 right-0 px-2.5 py-1 text-[9px] font-bold uppercase rounded-bl-xl shadow-sm flex items-center gap-1 z-10"
+               :class="item.verifikasi === 'Disetujui' ? 'bg-green-500 text-white' : item.verifikasi === 'Ditolak' ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-600'">
+            <span class="material-symbols-outlined text-[12px]">
+              {{ item.verifikasi === 'Disetujui' ? 'verified' : item.verifikasi === 'Ditolak' ? 'cancel' : 'pending' }}
+            </span>
+            {{ item.verifikasi === 'Disetujui' ? 'Disetujui' : item.verifikasi === 'Ditolak' ? 'Ditolak' : 'Belum Verifikasi' }}
+          </div>
+
+          <div class="flex justify-between items-start mb-2 mt-1">
+            <div class="flex-1 min-w-0 pr-24">
               <h4 class="font-bold text-gray-800 text-sm truncate">{{ item.perusahaan }}</h4>
               <!-- Tampilkan nama petugas jika yang login adalah admin -->
               <p v-if="role === 'admin'" class="text-[10px] text-blue-600 font-bold mt-0.5 truncate flex items-center gap-1">
                 <span class="material-symbols-outlined text-[12px]">person</span> {{ item.petugas }}
               </p>
             </div>
-            <span class="text-[10px] text-gray-400 font-mono bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 shrink-0 mt-0.5">
-              {{ formatTime(item.timestamp) }}
-            </span>
           </div>
 
           <p v-if="item.catatan" class="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg italic">"{{ item.catatan }}"</p>
 
-          <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+          <div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 flex-wrap gap-2">
             <div class="flex items-center gap-1">
               <span class="material-symbols-outlined text-[14px]" :class="item.status === 'Telah Dikunjungi' ? 'text-green-500' : 'text-red-500'">
                 {{ item.status === 'Telah Dikunjungi' ? 'check_circle' : 'error' }}
@@ -90,11 +107,40 @@
               <span class="text-[10px] font-bold" :class="item.status === 'Telah Dikunjungi' ? 'text-green-700' : 'text-red-700'">{{ item.status }}</span>
             </div>
 
-            <div class="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[9px] font-bold">
-              <span class="material-symbols-outlined text-[12px]">my_location</span>
-              Koordinat Disimpan
+            <div class="flex items-center gap-2">
+              <span class="text-[9px] text-gray-400 font-mono font-bold">{{ formatTime(item.timestamp) }}</span>
+              <div class="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-1 rounded text-[9px] font-bold">
+                <span class="material-symbols-outlined text-[12px]">my_location</span>
+                GPS Disimpan
+              </div>
+            </div>
+
+            <!-- ALASAN PENOLAKAN DITAMPILKAN DI SINI JIKA DITOLAK -->
+            <div v-if="item.verifikasi === 'Ditolak' && item.alasan_tolak" class="w-full mt-1 bg-red-50 border border-red-100 p-2.5 rounded-xl">
+              <p class="text-[9px] font-bold text-red-800 uppercase tracking-wider mb-0.5">Alasan Penolakan:</p>
+              <p class="text-xs text-red-600 italic">"{{ item.alasan_tolak }}"</p>
             </div>
           </div>
+
+          <!-- AKSI VERIFIKASI (KHUSUS ADMIN) -->
+          <div v-if="role === 'admin'" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 bg-gray-50/50 -mx-4 -mb-4 px-4 pb-4">
+            <p class="text-[10px] text-gray-500 font-bold flex-1 uppercase tracking-wider">Aksi Verifikasi:</p>
+            <button
+              @click="prosesVerifikasi(item, 'Disetujui')"
+              class="bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
+              :class="{'opacity-50 pointer-events-none': item.verifikasi === 'Disetujui'}"
+            >
+              <span class="material-symbols-outlined text-[14px]">check</span> Setujui
+            </button>
+            <button
+              @click="openRejectModal(item)"
+              class="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
+              :class="{'opacity-50 pointer-events-none': item.verifikasi === 'Ditolak'}"
+            >
+              <span class="material-symbols-outlined text-[14px]">close</span> Tolak
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -102,8 +148,8 @@
         <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 mb-3">
           <span class="material-symbols-outlined text-3xl">assignment</span>
         </div>
-        <p class="text-gray-500 font-medium text-sm">Belum ada laporan</p>
-        <p class="text-gray-400 text-xs mt-1">Belum ada riwayat pelaporan pada tanggal ini.</p>
+        <p class="text-gray-500 font-medium text-sm">Tidak ada laporan</p>
+        <p class="text-gray-400 text-xs mt-1">Sesuai dengan filter dan tanggal yang dipilih.</p>
       </div>
 
     </div>
@@ -234,6 +280,54 @@
       </div>
     </div>
 
+    <!-- MODAL PENOLAKAN LAPORAN (Khusus Admin) -->
+    <div v-if="showRejectModal" class="absolute inset-0 z-[700] bg-black/60 flex flex-col justify-end items-center transition-opacity" @click.self="showRejectModal = false">
+      <div class="bg-white rounded-t-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up">
+
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-red-50 rounded-t-3xl shrink-0">
+          <h3 class="text-lg font-bold text-red-800 flex items-center gap-2">
+            <span class="material-symbols-outlined">cancel</span> Tolak Laporan
+          </h3>
+          <button @click="showRejectModal = false" class="text-red-400 hover:text-red-600 transition"><span class="material-symbols-outlined">close</span></button>
+        </div>
+
+        <div class="p-6">
+          <p class="text-sm text-gray-600 mb-4">Berikan alasan Anda menolak laporan ini agar petugas dapat memperbaikinya.</p>
+          <textarea
+            v-model="rejectReason"
+            rows="3"
+            placeholder="Contoh: Bukti GPS tidak akurat / salah lokasi..."
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-red-500 outline-none text-sm resize-none mb-4"
+          ></textarea>
+
+          <div class="flex gap-3">
+            <button @click="showRejectModal = false" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-xl transition text-sm">Batal</button>
+            <button @click="submitReject" :disabled="!rejectReason.trim()" class="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">Kirim Penolakan</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL GPS FALLBACK (Pengganti Confirm Bawaan Browser) -->
+    <div v-if="showGpsModal" class="absolute inset-0 z-[700] bg-black/60 flex flex-col justify-end items-center transition-opacity" @click.self="showGpsModal = false">
+      <div class="bg-white rounded-t-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up">
+        <div class="p-6 text-center">
+          <div class="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span class="material-symbols-outlined text-3xl">location_off</span>
+          </div>
+          <h3 class="text-lg font-bold text-gray-800 mb-2">Gagal Mendapatkan GPS</h3>
+          <p class="text-sm text-gray-600 mb-6">{{ gpsErrorMsg }}</p>
+          <p class="text-xs text-gray-500 mb-6 border border-gray-200 p-3 rounded-lg bg-gray-50">Apakah Anda ingin melanjutkan pengiriman dengan koordinat simulasi (Default Samsat Bekasi)?</p>
+
+          <div class="flex gap-3">
+            <button @click="batalkanGPS" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-xl transition text-sm">Batal</button>
+            <button @click="gunakanFallbackGPS" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">Gunakan Fallback</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -244,9 +338,11 @@ import { useLaporanStore } from '../stores/laporan'
 import { useRuteStore } from '../stores/rute'
 import { Geolocation } from '@capacitor/geolocation' // IMPORT PLUGIN NATIVE CAPACITOR
 import jsPDF from 'jspdf' // IMPORT JSPDF
-
-// Import autoTable dengan cara ini agar kompatibel dengan Vite/Vue 3
 import autoTable from 'jspdf-autotable'
+
+// FUNGSI FIREBASE (Untuk update status verifikasi admin)
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '../services/firebase'
 
 const router = useRouter()
 const laporanStore = useLaporanStore()
@@ -254,6 +350,9 @@ const ruteStore = useRuteStore()
 
 const currentUser = localStorage.getItem('nama') || 'PENGGUNA'
 const role = localStorage.getItem('role') || 'petugas'
+
+// STATE FILTER VERIFIKASI
+const filterVerifikasi = ref('Semua')
 
 onMounted(() => {
   laporanStore.subscribeLaporan() // Aktifkan pendengar Real-time Laporan
@@ -313,15 +412,69 @@ const formatSelectedDate = computed(() => {
   return `${parseInt(parts[2])} ${monthNames[parseInt(parts[1]) - 1]} ${parts[0]}`
 })
 
-// === LOGIKA FILTER DAFTAR LAPORAN ===
+// === LOGIKA FILTER DAFTAR LAPORAN (Menyesuaikan dengan Filter Verifikasi) ===
 const reportsForSelectedDate = computed(() => {
-  // Jika admin, tampilkan laporan milik semua orang pada tanggal yang dipilih
-  if (role === 'admin') {
-    return laporanStore.laporanList.filter(r => r.date === selectedDate.value)
-  }
+  let list = laporanStore.laporanList.filter(r => r.date === selectedDate.value)
+
   // Jika petugas, hanya tampilkan miliknya
-  return laporanStore.laporanList.filter(r => r.date === selectedDate.value && r.petugas === currentUser)
+  if (role !== 'admin') {
+    list = list.filter(r => r.petugas === currentUser)
+  }
+
+  // Filter berdasarkan tab Verifikasi yang aktif
+  if (filterVerifikasi.value === 'Belum') {
+    list = list.filter(r => !r.verifikasi || r.verifikasi === 'Belum')
+  } else if (filterVerifikasi.value === 'Disetujui') {
+    list = list.filter(r => r.verifikasi === 'Disetujui')
+  } else if (filterVerifikasi.value === 'Ditolak') {
+    list = list.filter(r => r.verifikasi === 'Ditolak')
+  }
+
+  return list
 })
+
+// === FUNGSI VERIFIKASI & PENOLAKAN (ADMIN) ===
+const showRejectModal = ref(false)
+const rejectReason = ref('')
+const laporanToReject = ref(null)
+
+function openRejectModal(item) {
+  laporanToReject.value = item
+  rejectReason.value = ''
+  showRejectModal.value = true
+}
+
+async function submitReject() {
+  if (!rejectReason.value.trim() || !laporanToReject.value) return
+  await prosesVerifikasi(laporanToReject.value, 'Ditolak', rejectReason.value.trim())
+  showRejectModal.value = false
+}
+
+async function prosesVerifikasi(item, status, alasan = '') {
+  try {
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'SatriaApp'
+    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'laporan', item.id)
+
+    const payload = { verifikasi: status }
+    if (status === 'Ditolak') {
+      payload.alasan_tolak = alasan
+    }
+
+    // Update langsung ke database Firebase
+    await updateDoc(docRef, payload)
+
+    // UPDATE STATE LOKAL AGAR LANGSUNG BERUBAH TANPA REFRESH
+    item.verifikasi = status
+    if (status === 'Ditolak') {
+      item.alasan_tolak = alasan
+    }
+
+    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: `Laporan berhasil ${status.toLowerCase()}!`, type: 'success' } }))
+  } catch (error) {
+    console.error("Error verifikasi:", error)
+    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Gagal memverifikasi laporan. Pastikan koneksi internet stabil.', type: 'error' } }))
+  }
+}
 
 // === LOGIKA MODAL REKAP ADMIN (Tanda !) ===
 const showAdminSummaryModal = ref(false)
@@ -367,6 +520,10 @@ const formData = ref({
   catatan: ''
 })
 
+// State untuk Fallback GPS (Mengganti fungsi window.confirm)
+const showGpsModal = ref(false)
+const gpsErrorMsg = ref('')
+
 async function prosesPengirimanLaporan(lat, lng) {
   const payload = {
     perusahaan: formData.value.perusahaan,
@@ -374,6 +531,7 @@ async function prosesPengirimanLaporan(lat, lng) {
     catatan: formData.value.catatan,
     petugas: currentUser,
     date: selectedDate.value,
+    verifikasi: 'Belum', // Default saat laporan baru masuk
     lat: lat,
     lng: lng
   }
@@ -384,6 +542,7 @@ async function prosesPengirimanLaporan(lat, lng) {
 
   isLoadingGPS.value = false
   showModal.value = false
+  showGpsModal.value = false
 
   // Reset form
   formData.value = { perusahaan: '', status: 'Telah Dikunjungi', catatan: '' }
@@ -414,17 +573,19 @@ async function kirimLaporan() {
   } catch (error) {
     console.warn("Error GPS Capacitor:", error)
 
-    // Fallback Darurat jika gagal ambil lokasi
-    const gunakanFallback = confirm(
-      `Gagal mengambil GPS: ${error.message}\n\nPastikan GPS di HP menyala.\n\nApakah Anda ingin melanjutkan pengiriman dengan koordinat simulasi (Default Samsat Bekasi)?`
-    )
-
-    if (gunakanFallback) {
-      await prosesPengirimanLaporan(-6.2700806, 107.1481756)
-    } else {
-      isLoadingGPS.value = false
-    }
+    // Munculkan Modal Fallback Custom (Pengganti Confirm Darurat)
+    gpsErrorMsg.value = error.message
+    showGpsModal.value = true
   }
+}
+
+function batalkanGPS() {
+  showGpsModal.value = false
+  isLoadingGPS.value = false
+}
+
+async function gunakanFallbackGPS() {
+  await prosesPengirimanLaporan(-6.2700806, 107.1481756)
 }
 
 // === LOGIKA CETAK PDF ===
@@ -443,7 +604,7 @@ function cetakLaporanBulanan() {
     }
 
     if (laporanBulanIni.length === 0) {
-      alert(`Tidak ada laporan pada bulan ${monthNames[currentMonth.value]} ${currentYear.value} untuk dicetak.`);
+      window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: `Tidak ada laporan pada bulan ${monthNames[currentMonth.value]} ${currentYear.value} untuk dicetak.`, type: 'error' } }))
       return;
     }
 
@@ -476,10 +637,18 @@ function cetakLaporanBulanan() {
           unitTidakBerfungsi++; // Default fallback
       }
 
+      const valStatus = item.status === 'Telah Dikunjungi' ? 'Telah dikunjungi' : item.status;
+      let verif = item.verifikasi || 'Belum Verifikasi';
+
+      // Sisipkan Alasan Penolakan ke Hasil Cetak PDF
+      if (item.verifikasi === 'Ditolak' && item.alasan_tolak) {
+        verif = `Ditolak\n(Alasan: ${item.alasan_tolak})`;
+      }
+
       return [
         index + 1,
         item.perusahaan,
-        item.status === 'Telah Dikunjungi' ? 'Telah dikunjungi' : item.status,
+        `${valStatus}\n[${verif}]`,
         kondisiMeter
       ];
     });
@@ -583,7 +752,7 @@ function cetakLaporanBulanan() {
 
   } catch (error) {
     console.error("Gagal membuat PDF:", error);
-    alert("Terjadi kesalahan saat memproses laporan PDF: " + error.message);
+    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: `Terjadi kesalahan saat memproses laporan PDF.`, type: 'error' } }))
   }
 }
 </script>
@@ -591,4 +760,13 @@ function cetakLaporanBulanan() {
 <style scoped>
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @keyframes slideUp { 0% { transform: translateY(100%); } 100% { transform: translateY(0); } }
+
+/* CSS untuk menyembunyikan scrollbar di tab verifikasi horizontal */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>
