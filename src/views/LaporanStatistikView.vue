@@ -131,6 +131,11 @@ import { useRouter } from 'vue-router'
 import { useArsipStore } from '../stores/arsip'
 import { useJadwalStore } from '../stores/jadwal'
 import { useRuteStore } from '../stores/rute'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 const router = useRouter()
 const arsipStore = useArsipStore()
@@ -163,9 +168,122 @@ const jadwalRapat = computed(() => jadwalStore.jadwalList.filter(j => j.type ===
 const rutePerusahaan = computed(() => ruteStore.lokasiList.filter(r => (!r.kategori || r.kategori === 'Perusahaan')).length)
 const rutePribadi = computed(() => ruteStore.lokasiList.filter(r => r.kategori === 'Pribadi').length)
 
+async function cetakHtmlAtauSharePdf(html, namaFile, judulDokumen = 'Laporan') {
+  // Kalau dibuka di browser/laptop, tetap pakai print iframe biasa
+  if (!Capacitor.isNativePlatform()) {
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    document.body.appendChild(iframe)
+
+    const iframeDoc = iframe.contentWindow.document
+    iframeDoc.open()
+    iframeDoc.write(`
+      <html>
+      <head>
+        <title>${judulDokumen}</title>
+        <style>
+          @page { size: A4 portrait; margin: 15mm; }
+          body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 0;
+          }
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+        </style>
+      </head>
+      <body>${html}</body>
+      </html>
+    `)
+    iframeDoc.close()
+
+    setTimeout(() => {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+      setTimeout(() => document.body.removeChild(iframe), 1000)
+    }, 500)
+
+    return
+  }
+
+  // Kalau di APK Android, ubah HTML menjadi PDF lalu Share/Cetak
+  const wrapper = document.createElement('div')
+  wrapper.style.position = 'fixed'
+  wrapper.style.left = '-9999px'
+  wrapper.style.top = '0'
+  wrapper.style.width = '794px'
+  wrapper.style.background = '#fff'
+  wrapper.style.color = '#000'
+  wrapper.style.padding = '40px'
+  wrapper.innerHTML = html
+
+  document.body.appendChild(wrapper)
+
+  try {
+    const canvas = await html2canvas(wrapper, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+
+    const imgWidth = pageWidth
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+    let heightLeft = imgHeight
+    let position = 0
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+
+    const base64Pdf = pdf.output('datauristring').split(',')[1]
+
+    await Filesystem.writeFile({
+      path: namaFile,
+      data: base64Pdf,
+      directory: Directory.Cache
+    })
+
+    const fileUri = await Filesystem.getUri({
+      path: namaFile,
+      directory: Directory.Cache
+    })
+
+    await Share.share({
+      title: judulDokumen,
+      text: 'File laporan dalam bentuk PDF.',
+      files: [fileUri.uri],
+      dialogTitle: 'Bagikan / Cetak Laporan'
+    })
+  } catch (error) {
+    console.error('Gagal membuat PDF:', error)
+    alert('Gagal membuat PDF laporan.')
+  } finally {
+    document.body.removeChild(wrapper)
+  }
+}
 
 // === FUNGSI CETAK LAPORAN (PDF) ===
-function cetakLaporan() {
+async function cetakLaporan() {
   const tgl = new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})
   const jam = new Date().toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})
 
@@ -238,33 +356,11 @@ function cetakLaporan() {
       <p style="font-size: 12px; font-weight: bold; text-decoration: underline;">${localStorage.getItem('nama') || 'Admin'}</p>
     </div>
   `
-
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
-  document.body.appendChild(iframe)
-
-  const doc = iframe.contentWindow.document
-  doc.open()
-  doc.write(`
-    <html>
-    <head>
-      <title>Laporan_Rekapitulasi_Sistem</title>
-      <style>
-        @page { size: A4 portrait; margin: 20mm; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #000; background: #fff; margin: 0; }
-      </style>
-    </head>
-    <body>${html}</body>
-    </html>
-  `)
-  doc.close()
-
-  setTimeout(() => {
-    iframe.contentWindow.focus()
-    iframe.contentWindow.print()
-    setTimeout(() => document.body.removeChild(iframe), 1000)
-  }, 500)
+  await cetakHtmlAtauSharePdf(
+  html,
+  'Laporan_Rekapitulasi_Sistem.pdf',
+  'Laporan Rekapitulasi Sistem'
+)
 }
 </script>
 

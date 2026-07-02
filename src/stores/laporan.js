@@ -28,7 +28,11 @@ export const useLaporanStore = defineStore('laporan', () => {
           lat: parseFloat(data.latitude || data.lat || 0),
           lng: parseFloat(data.longitude || data.lng || 0),
           catatan: data.catatan || '',
-          timestamp: data.created_at || data.timestamp || ''
+          timestamp: data.created_at || data.timestamp || '',
+          verifikasi: data.verifikasi || 'Belum Verifikasi',
+          alasan_tolak: data.alasan_tolak || '',
+          diverifikasi_oleh: data.diverifikasi_oleh || '',
+          diverifikasi_pada: data.diverifikasi_pada || ''
         }
       })
       loading.value = false
@@ -60,7 +64,11 @@ export const useLaporanStore = defineStore('laporan', () => {
         catatan: data.catatan || '',
         latitude: String(data.lat), // Format varchar/String
         longitude: String(data.lng),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        verifikasi: 'Belum Verifikasi',
+        alasan_tolak: '',
+        diverifikasi_oleh: '',
+        diverifikasi_pada: ''
       }
 
       await setDoc(doc(db, ...laporanPath, docId), payload)

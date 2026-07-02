@@ -10,7 +10,7 @@
         {{ role === 'admin' ? 'Pantau Laporan Harian' : 'Laporan Harian' }}
       </h1>
       <!-- TOMBOL CETAK PDF -->
-      <button @click="cetakLaporanBulanan" class="p-2 hover:bg-white/20 rounded-full transition flex items-center justify-center bg-white/10">
+      <button @click="bukaOpsiCetakLaporan" class="p-2 hover:bg-white/20 rounded-full transition flex items-center justify-center bg-white/10">
         <span class="material-symbols-outlined">print</span>
       </button>
     </div>
@@ -123,21 +123,25 @@
           </div>
 
           <!-- AKSI VERIFIKASI (KHUSUS ADMIN) -->
-          <div v-if="role === 'admin'" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 bg-gray-50/50 -mx-4 -mb-4 px-4 pb-4">
+          <div v-if="role === 'admin' && (!item.verifikasi || item.verifikasi === 'Belum Verifikasi' || item.verifikasi === 'Belum')" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100 bg-gray-50/50 -mx-4 -mb-4 px-4 pb-4">
             <p class="text-[10px] text-gray-500 font-bold flex-1 uppercase tracking-wider">Aksi Verifikasi:</p>
             <button
               @click="prosesVerifikasi(item, 'Disetujui')"
-              class="bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
-              :class="{'opacity-50 pointer-events-none': item.verifikasi === 'Disetujui'}"
+              :disabled="verifyingId === item.id || item.verifikasi === 'Disetujui'"
+              class="bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 disabled:opacity-50 disabled:pointer-events-none px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
             >
-              <span class="material-symbols-outlined text-[14px]">check</span> Setujui
+              <span v-if="verifyingId === item.id" class="w-3.5 h-3.5 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></span>
+              <span v-else class="material-symbols-outlined text-[14px]">check</span>
+              {{ verifyingId === item.id ? 'Memproses...' : 'Setujui' }}
             </button>
             <button
               @click="openRejectModal(item)"
-              class="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
-              :class="{'opacity-50 pointer-events-none': item.verifikasi === 'Ditolak'}"
+              :disabled="verifyingId === item.id || item.verifikasi === 'Ditolak'"
+              class="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:pointer-events-none px-3 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 active:scale-95"
             >
-              <span class="material-symbols-outlined text-[14px]">close</span> Tolak
+              <span v-if="verifyingId === item.id" class="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></span>
+              <span v-else class="material-symbols-outlined text-[14px]">close</span>
+              {{ verifyingId === item.id ? 'Memproses...' : 'Tolak' }}
             </button>
           </div>
 
@@ -302,7 +306,14 @@
 
           <div class="flex gap-3">
             <button @click="showRejectModal = false" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-xl transition text-sm">Batal</button>
-            <button @click="submitReject" :disabled="!rejectReason.trim()" class="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm">Kirim Penolakan</button>
+            <button
+              @click="submitReject"
+              :disabled="!rejectReason.trim() || verifyingId === laporanToReject?.id"
+              class="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-bold py-3.5 rounded-xl shadow-md transition text-sm flex items-center justify-center gap-2"
+            >
+              <span v-if="verifyingId === laporanToReject?.id" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              {{ verifyingId === laporanToReject?.id ? 'Memproses...' : 'Kirim Penolakan' }}
+            </button>
           </div>
         </div>
 
@@ -329,6 +340,89 @@
     </div>
 
   </div>
+
+  <!-- MODAL OPSI CETAK LAPORAN -->
+<div
+  v-if="showPrintOptionModal"
+  class="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 px-4"
+>
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800">Opsi Cetak Laporan</h3>
+      <button
+        @click="showPrintOptionModal = false"
+        class="text-gray-400 hover:text-gray-600"
+      >
+        ✕
+      </button>
+    </div>
+
+    <p class="text-sm text-gray-500 mb-4">
+      Pilih laporan yang ingin dicetak untuk periode
+      <b>{{ monthNames[currentMonth] }} {{ currentYear }}</b>.
+    </p>
+
+    <div class="space-y-3">
+      <label class="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+        <input
+          type="radio"
+          value="semua"
+          v-model="printMode"
+          class="w-4 h-4"
+        >
+        <div>
+          <p class="font-semibold text-gray-800">Print Semua Petugas</p>
+          <p class="text-xs text-gray-500">Mencetak semua laporan petugas pada bulan ini.</p>
+        </div>
+      </label>
+
+      <label class="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+        <input
+          type="radio"
+          value="petugas"
+          v-model="printMode"
+          class="w-4 h-4"
+        >
+        <div>
+          <p class="font-semibold text-gray-800">Pilih Petugas</p>
+          <p class="text-xs text-gray-500">Mencetak laporan berdasarkan petugas tertentu.</p>
+        </div>
+      </label>
+
+      <select
+        v-if="printMode === 'petugas'"
+        v-model="selectedPrintPetugas"
+        class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">-- Pilih Petugas --</option>
+        <option
+          v-for="petugas in daftarPetugasLaporanBulanIni"
+          :key="petugas"
+          :value="petugas"
+        >
+          {{ petugas }}
+        </option>
+      </select>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-5">
+      <button
+        @click="showPrintOptionModal = false"
+        class="px-4 py-2 rounded-xl border text-gray-600 hover:bg-gray-50"
+      >
+        Batal
+      </button>
+
+      <button
+        @click="konfirmasiCetakLaporan"
+        class="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+      >
+        Cetak
+      </button>
+    </div>
+  </div>
+</div>
+
 </template>
 
 <script setup>
@@ -339,6 +433,10 @@ import { useRuteStore } from '../stores/rute'
 import { Geolocation } from '@capacitor/geolocation' // IMPORT PLUGIN NATIVE CAPACITOR
 import jsPDF from 'jspdf' // IMPORT JSPDF
 import autoTable from 'jspdf-autotable'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
+
 
 // FUNGSI FIREBASE (Untuk update status verifikasi admin)
 import { doc, updateDoc } from 'firebase/firestore'
@@ -354,6 +452,47 @@ const role = localStorage.getItem('role') || 'petugas'
 // STATE FILTER VERIFIKASI
 const filterVerifikasi = ref('Semua')
 
+const showPrintOptionModal = ref(false)
+const printMode = ref('semua')
+const selectedPrintPetugas = ref('')
+
+const daftarPetugasLaporanBulanIni = computed(() => {
+  const currentMonthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`
+
+  const list = laporanStore.laporanList
+    .filter(r => r.date && r.date.startsWith(currentMonthStr))
+    .map(r => r.petugas)
+    .filter(Boolean)
+
+  return [...new Set(list)]
+})
+
+function bukaOpsiCetakLaporan() {
+  if (role === 'admin') {
+    printMode.value = 'semua'
+    selectedPrintPetugas.value = ''
+    showPrintOptionModal.value = true
+    return
+  }
+
+  cetakLaporanBulanan()
+}
+
+async function konfirmasiCetakLaporan() {
+  if (printMode.value === 'petugas' && !selectedPrintPetugas.value) {
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: 'Silakan pilih petugas terlebih dahulu.', type: 'error' }
+    }))
+    return
+  }
+
+  showPrintOptionModal.value = false
+
+  await cetakLaporanBulanan(
+    printMode.value === 'semua' ? 'semua' : selectedPrintPetugas.value
+  )
+}
+
 onMounted(() => {
   laporanStore.subscribeLaporan() // Aktifkan pendengar Real-time Laporan
   ruteStore.loadLokasi() // Load lokasi perusahaan untuk form pilihan & rekap
@@ -366,7 +505,12 @@ onUnmounted(() => {
 
 // Dapatkan lokasi/perusahaan yang di-assign ke user ini (Hanya relevan bagi Petugas)
 const assignedLocations = computed(() => {
-  return ruteStore.lokasiList.filter(l => l.petugas === currentUser)
+  return ruteStore.lokasiList.filter(l => {
+    const isPetugasIni = l.petugas === currentUser
+    const isPerusahaan = String(l.kategori || '').toLowerCase() === 'perusahaan'
+
+    return isPetugasIni && isPerusahaan
+  })
 })
 
 // === LOGIKA KALENDER ===
@@ -437,42 +581,76 @@ const reportsForSelectedDate = computed(() => {
 const showRejectModal = ref(false)
 const rejectReason = ref('')
 const laporanToReject = ref(null)
+const verifyingId = ref(null)
 
 function openRejectModal(item) {
   laporanToReject.value = item
-  rejectReason.value = ''
+  rejectReason.value = item.alasan_tolak || ''
   showRejectModal.value = true
 }
 
 async function submitReject() {
   if (!rejectReason.value.trim() || !laporanToReject.value) return
   await prosesVerifikasi(laporanToReject.value, 'Ditolak', rejectReason.value.trim())
-  showRejectModal.value = false
+}
+
+function updateLaporanLokal(id, patch) {
+  const index = laporanStore.laporanList.findIndex(r => r.id === id)
+  if (index === -1) return
+
+  // Gunakan replace object agar Vue/Pinia pasti mendeteksi perubahan tampilan.
+  laporanStore.laporanList.splice(index, 1, {
+    ...laporanStore.laporanList[index],
+    ...patch
+  })
 }
 
 async function prosesVerifikasi(item, status, alasan = '') {
-  try {
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'SatriaApp'
-    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'laporan', item.id)
+  if (!item?.id || verifyingId.value === item.id) return
 
-    const payload = { verifikasi: status }
+  const previousData = { ...item }
+  const payload = {
+    verifikasi: status,
+    alasan_tolak: status === 'Ditolak' ? alasan : '',
+    diverifikasi_oleh: currentUser,
+    diverifikasi_pada: new Date().toISOString()
+  }
+
+  try {
+    const docRef = doc(db, 'artifacts', 'SatriaApp', 'public', 'data', 'laporan', item.id)
+
+    verifyingId.value = item.id
+
+    // Optimistic update: tampilan berubah dulu, Firebase menyusul.
+    updateLaporanLokal(item.id, payload)
+
+    // Tutup modal lebih cepat agar perubahan status langsung terlihat.
     if (status === 'Ditolak') {
-      payload.alasan_tolak = alasan
+      showRejectModal.value = false
     }
 
-    // Update langsung ke database Firebase
     await updateDoc(docRef, payload)
 
-    // UPDATE STATE LOKAL AGAR LANGSUNG BERUBAH TANPA REFRESH
-    item.verifikasi = status
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: `Laporan berhasil ${status.toLowerCase()}!`, type: 'success' }
+    }))
+  } catch (error) {
+    console.error('Error verifikasi:', error)
+
+    // Jika Firebase gagal, kembalikan tampilan seperti semula.
+    updateLaporanLokal(item.id, previousData)
+
     if (status === 'Ditolak') {
-      item.alasan_tolak = alasan
+      showRejectModal.value = true
     }
 
-    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: `Laporan berhasil ${status.toLowerCase()}!`, type: 'success' } }))
-  } catch (error) {
-    console.error("Error verifikasi:", error)
-    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Gagal memverifikasi laporan. Pastikan koneksi internet stabil.', type: 'error' } }))
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: 'Gagal memverifikasi laporan. Pastikan koneksi internet stabil.', type: 'error' }
+    }))
+  } finally {
+    verifyingId.value = null
+    laporanToReject.value = null
+    rejectReason.value = ''
   }
 }
 
@@ -589,7 +767,7 @@ async function gunakanFallbackGPS() {
 }
 
 // === LOGIKA CETAK PDF ===
-function cetakLaporanBulanan() {
+async function cetakLaporanBulanan(targetPetugas = null) {
   try {
     // 1. Ambil data laporan sesuai bulan dan tahun yang aktif di kalender
     const currentMonthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, '0')}`;
@@ -600,7 +778,18 @@ function cetakLaporanBulanan() {
 
     // Jika yang login petugas, filter hanya laporannya sendiri.
     if (role === 'petugas') {
-      laporanBulanIni = laporanBulanIni.filter(r => r.petugas === currentUser);
+      laporanBulanIni = laporanBulanIni.filter(r => r.petugas === currentUser)
+    }
+
+    // Jika admin memilih Print Semua, cetak laporan dipisah per petugas
+    if (role === 'admin' && targetPetugas === 'semua') {
+      await cetakSemuaPetugasPerNama(laporanBulanIni)
+      return
+    }
+
+    // Jika admin memilih petugas tertentu
+    if (role === 'admin' && targetPetugas && targetPetugas !== 'semua') {
+      laporanBulanIni = laporanBulanIni.filter(r => r.petugas === targetPetugas)
     }
 
     if (laporanBulanIni.length === 0) {
@@ -744,16 +933,240 @@ function cetakLaporanBulanan() {
     doc.text("Petugas Penelusuran,", pageWidth - margin, signatureY, { align: 'right' });
 
     doc.setFont("times", "bold");
-    doc.text(currentUser, pageWidth - margin, signatureY + 25, { align: 'right' });
+    const namaPenandatangan =
+      role === 'admin' && targetPetugas && targetPetugas !== 'semua'
+        ? targetPetugas
+        : currentUser
+
+    doc.text(namaPenandatangan, pageWidth - margin, signatureY + 25, { align: 'right' });
 
     // 3. Download / Simpan File
-    const namaFile = `Laporan_Penelusuran_${monthNames[currentMonth.value]}_${currentYear.value}.pdf`;
-    doc.save(namaFile);
+    const suffixPetugas =
+      role === 'admin' && targetPetugas && targetPetugas !== 'semua'
+        ? `_${targetPetugas.replace(/\s+/g, '_')}`
+        : '_Semua_Petugas'
+
+    const namaFile = `Laporan_Penelusuran_${monthNames[currentMonth.value]}_${currentYear.value}${suffixPetugas}.pdf`;
+    await simpanAtauSharePdf(doc, namaFile);
 
   } catch (error) {
     console.error("Gagal membuat PDF:", error);
     window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: `Terjadi kesalahan saat memproses laporan PDF.`, type: 'error' } }))
   }
+}
+
+async function cetakSemuaPetugasPerNama(laporanBulanIni) {
+  try {
+    const doc = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 14
+    const periode = `${monthNames[currentMonth.value]} ${currentYear.value}`
+
+    const grupPetugas = laporanBulanIni.reduce((result, item) => {
+      const namaPetugas = item.petugas || 'Tanpa Nama Petugas'
+
+      if (!result[namaPetugas]) {
+        result[namaPetugas] = []
+      }
+
+      result[namaPetugas].push(item)
+      return result
+    }, {})
+
+    const daftarGrup = Object.entries(grupPetugas)
+
+    daftarGrup.forEach(([namaPetugas, daftarLaporan], groupIndex) => {
+      if (groupIndex > 0) {
+        doc.addPage()
+      }
+
+      const totalObjek = daftarLaporan.length
+      let unitRusak = 0
+      let unitTidakBerfungsi = 0
+
+      const tableData = daftarLaporan.map((item, index) => {
+        let kondisiMeter = 'Berfungsi dengan baik'
+
+        if (item.catatan) {
+          kondisiMeter = item.catatan
+          const catatanLower = item.catatan.toLowerCase()
+
+          if (catatanLower.includes('rusak')) {
+            unitRusak++
+          } else if (catatanLower.includes('tidak berfungsi')) {
+            unitTidakBerfungsi++
+          }
+        } else if (item.status === 'Terjadi Masalah') {
+          kondisiMeter = 'Water meter bermasalah / Perlu Pengecekan'
+          unitTidakBerfungsi++
+        }
+
+        const valStatus = item.status === 'Telah Dikunjungi'
+          ? 'Telah dikunjungi'
+          : item.status
+
+        let verif = item.verifikasi || 'Belum Verifikasi'
+
+        if (item.verifikasi === 'Ditolak' && item.alasan_tolak) {
+          verif = `Ditolak\n(Alasan: ${item.alasan_tolak})`
+        }
+
+        return [
+          index + 1,
+          item.perusahaan,
+          `${valStatus}\n[${verif}]`,
+          kondisiMeter
+        ]
+      })
+
+      const laporanBermasalah = unitRusak + unitTidakBerfungsi
+      const laporanBagus = totalObjek - laporanBermasalah
+
+      doc.setFont('times', 'bold')
+      doc.setFontSize(12)
+      doc.text('LAPORAN PETUGAS PENELUSURAN', pageWidth / 2, 20, { align: 'center' })
+      doc.text('PAJAK METER AIR PERMUKAAN', pageWidth / 2, 26, { align: 'center' })
+
+      doc.setFontSize(11)
+      doc.setFont('times', 'normal')
+
+      const startYInfo = 40
+      const lineHeight = 6
+      const col1X = margin
+      const col2X = 45
+      const col3X = 48
+
+      doc.text('Jenis Laporan', col1X, startYInfo)
+      doc.text(':', col2X, startYInfo)
+      doc.text('Penelusuran dan evaluasi kondisi water meter', col3X, startYInfo)
+
+      doc.text('Objek', col1X, startYInfo + lineHeight)
+      doc.text(':', col2X, startYInfo + lineHeight)
+      doc.text('Perusahaan/PDAM', col3X, startYInfo + lineHeight)
+
+      doc.text('Periode', col1X, startYInfo + lineHeight * 2)
+      doc.text(':', col2X, startYInfo + lineHeight * 2)
+      doc.text(periode, col3X, startYInfo + lineHeight * 2)
+
+      doc.text('Petugas', col1X, startYInfo + lineHeight * 3)
+      doc.text(':', col2X, startYInfo + lineHeight * 3)
+      doc.text(namaPetugas, col3X, startYInfo + lineHeight * 3)
+
+      doc.text('Total Objek', col1X, startYInfo + lineHeight * 4)
+      doc.text(':', col2X, startYInfo + lineHeight * 4)
+      doc.text(`${totalObjek} Perusahaan`, col3X, startYInfo + lineHeight * 4)
+
+      autoTable(doc, {
+        startY: startYInfo + lineHeight * 5,
+        head: [['No', 'Nama Perusahaan', 'Status', 'Kondisi Water Meter']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [230, 230, 230],
+          textColor: [0, 0, 0],
+          fontStyle: 'bold',
+          font: 'times',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1
+        },
+        bodyStyles: {
+          textColor: [0, 0, 0],
+          font: 'times',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 3
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { cellWidth: 65 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 'auto' }
+        }
+      })
+
+      let rincianBermasalah = ''
+
+      if (laporanBermasalah > 0) {
+        if (unitRusak > 0 && unitTidakBerfungsi > 0) {
+          rincianBermasalah = `, terdiri dari ${unitRusak} unit rusak dan ${unitTidakBerfungsi} unit tidak berfungsi`
+        } else if (unitRusak > 0) {
+          rincianBermasalah = `, terdiri dari ${unitRusak} unit rusak`
+        } else if (unitTidakBerfungsi > 0) {
+          rincianBermasalah = `, terdiri dari ${unitTidakBerfungsi} unit tidak berfungsi`
+        }
+      }
+
+      const finalY = doc.lastAutoTable.finalY + 10
+
+      doc.setFont('times', 'bold')
+      doc.text('Kesimpulan', margin, finalY)
+
+      doc.setFont('times', 'normal')
+
+      const kesimpulanTeks = `Berdasarkan hasil penelusuran, petugas ${namaPetugas} telah melakukan kunjungan ke ${totalObjek} perusahaan yang telah ditugaskan. Dari hasil pemeriksaan kondisi water meter, terdapat ${laporanBagus} water meter berfungsi dengan baik dan ${laporanBermasalah} water meter memerlukan tindak lanjut${rincianBermasalah}.`
+
+      const kesimpulanTeks2 = `Objek dengan water meter rusak atau tidak berfungsi perlu menjadi prioritas evaluasi, terutama untuk memastikan validitas data pengukuran dan keberlanjutan pemantauan pajak meter air permukaan.`
+
+      const splitText1 = doc.splitTextToSize(kesimpulanTeks, pageWidth - margin * 2)
+      doc.text(splitText1, margin, finalY + 6)
+
+      const finalY2 = finalY + 6 + splitText1.length * 5
+      const splitText2 = doc.splitTextToSize(kesimpulanTeks2, pageWidth - margin * 2)
+      doc.text(splitText2, margin, finalY2)
+
+      const signatureY = finalY2 + splitText2.length * 5 + 15
+
+      doc.text('Petugas Penelusuran,', pageWidth - margin, signatureY, { align: 'right' })
+
+      doc.setFont('times', 'bold')
+      doc.text(namaPetugas, pageWidth - margin, signatureY + 25, { align: 'right' })
+    })
+
+    const namaFile = `Laporan_Penelusuran_${monthNames[currentMonth.value]}_${currentYear.value}_Semua_Petugas.pdf`
+
+    await simpanAtauSharePdf(doc, namaFile)
+  } catch (error) {
+    console.error('Gagal membuat laporan semua petugas:', error)
+
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: {
+        message: 'Terjadi kesalahan saat mencetak laporan semua petugas.',
+        type: 'error'
+      }
+    }))
+  }
+}
+
+async function simpanAtauSharePdf(doc, namaFile) {
+  // Kalau dibuka di browser/laptop, tetap download seperti biasa
+  if (!Capacitor.isNativePlatform()) {
+    doc.save(namaFile)
+    return
+  }
+
+  // Kalau APK Android, simpan ke cache lalu buka menu share/cetak
+  const base64Pdf = doc.output('datauristring').split(',')[1]
+
+  await Filesystem.writeFile({
+    path: namaFile,
+    data: base64Pdf,
+    directory: Directory.Cache
+  })
+
+  const fileUri = await Filesystem.getUri({
+    path: namaFile,
+    directory: Directory.Cache
+  })
+
+  await Share.share({
+    title: 'Laporan Petugas',
+    text: 'File laporan petugas dalam bentuk PDF.',
+    files: [fileUri.uri],
+    dialogTitle: 'Bagikan / Cetak Laporan'
+  })
 }
 </script>
 
