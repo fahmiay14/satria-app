@@ -32,11 +32,11 @@
         </div>
 
         <div class="flex gap-2">
-          <input type="file" ref="fileInput" @change="importCSV" accept=".csv" class="hidden" />
+          <input type="file" ref="fileInput" @change="importExcel" accept=".xlsx,.xls" class="hidden" />
           <button @click="triggerFileInput" class="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg shadow-sm transition text-xs font-bold active:scale-95">
             <span class="material-symbols-outlined text-[16px]">upload_file</span> Import
           </button>
-          <button @click="exportCSV" class="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-lg shadow-sm transition text-xs font-bold active:scale-95">
+          <button @click="exportExcel" class="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-lg shadow-sm transition text-xs font-bold active:scale-95">
             <span class="material-symbols-outlined text-[16px]">download</span> Export
           </button>
         </div>
@@ -123,8 +123,6 @@ import { useRouter } from 'vue-router'
 import { useArsipStore } from '../stores/arsip'
 import ArsipModal from '../components/ArsipModal.vue'
 import DeleteModal from '../components/DeleteModal.vue'
-import { db } from '../services/firebase'
-import { writeBatch, doc } from 'firebase/firestore'
 
 const router = useRouter()
 const store = useArsipStore()
@@ -212,62 +210,44 @@ async function eksekusiHapus() {
   showToast('Data berhasil dihapus!')
 }
 
-function exportCSV() {
-  if (store.arsipList.length === 0) return alert("Tidak ada data untuk diekspor")
-  let csvContent = "Nomor Surat,No Polisi,Status\n"
-  store.arsipList.forEach(row => { csvContent += `"${row.no_surat}","${row.no_polisi}","${row.status}"\n` })
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement("a")
-  link.setAttribute("href", URL.createObjectURL(blob))
-  link.setAttribute("download", `Data_Arsip_${new Date().toISOString().slice(0,10)}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  showToast('Data CSV sedang diunduh', 'info')
+// === EXPORT KE EXCEL (.xlsx) ===
+// Logic pembuatan file (styling, lebar kolom, dst) ada di store supaya
+// hasilnya identik dengan yang di-export dari desktop admin.
+function exportExcel() {
+  try {
+    store.exportArsipToExcel()
+    showToast('File Excel sedang diunduh', 'info')
+  } catch (err) {
+    showToast(err.message || 'Gagal mengekspor data', 'error')
+  }
 }
 
 function triggerFileInput() { fileInput.value.click() }
 
-async function importCSV(event) {
+// === IMPORT DARI EXCEL (.xlsx / .xls) ===
+// Hanya mengambil kolom A (Nomor Surat) & kolom B (No Polisi), baris 1
+// dianggap header. Validasi & penulisan ke Firestore ditangani store
+// (importArsipFromExcel) supaya perilakunya sama persis dengan desktop admin.
+async function importExcel(event) {
   const file = event.target.files[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    const text = e.target.result
-    const rows = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0)
-    if (rows.length < 2) return showToast("File CSV kosong atau tidak valid", "error")
-    store.loading = true
-    try {
-      let batch = writeBatch(db)
-      let count = 0
-      for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i].split(',').map(col => col.replace(/(^"|"$)/g, '').trim())
-        if (cols.length >= 2) {
-          const id = "ARSIP-IMP-" + Date.now() + "-" + i
-          const docRef = doc(db, 'artifacts', 'SatriaApp', 'public', 'data', 'arsip', id)
-          batch.set(docRef, {
-            no_surat: parseInt(cols[0]),
-            no_polisi: cols[1].toUpperCase(),
-            status: cols[2] || 'Tersedia',
-            id_admin: localStorage.getItem('userId'),
-            nama_admin: localStorage.getItem('nama'),
-            created_at: new Date().toISOString()
-          })
-          count++
-          if (count === 500) { await batch.commit(); batch = writeBatch(db); count = 0 }
-        }
-      }
-      if (count > 0) await batch.commit()
-      await store.loadArsip()
-      showToast(`${rows.length - 1} data berhasil diimpor!`)
-    } catch(err) {
-      console.error(err)
-      showToast("Terjadi error saat mengimpor CSV", "error")
-    } finally {
-      store.loading = false
-      event.target.value = ''
+
+  try {
+    const result = await store.importArsipFromExcel(file)
+    if (result.errors.length > 0) {
+      console.warn('Baris yang dilewati saat import:\n' + result.errors.join('\n'))
+      showToast(`${result.imported} data berhasil diimpor, ${result.errors.length} baris dilewati (detail di console)`, 'info')
+    } else {
+      showToast(`${result.imported} data berhasil diimpor!`)
     }
+  } catch (err) {
+    console.error(err)
+    if (err.details && err.details.length > 0) {
+      console.warn('Detail baris ditolak:\n' + err.details.join('\n'))
+    }
+    showToast(err.message || 'Terjadi error saat mengimpor Excel', 'error')
+  } finally {
+    event.target.value = ''
   }
-  reader.readAsText(file)
 }
 </script>

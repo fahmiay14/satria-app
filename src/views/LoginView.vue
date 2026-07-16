@@ -191,7 +191,7 @@
     <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
       <div class="flex items-center gap-2">
         <div class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-        <p class="text-xs text-gray-500 font-medium">System Online • v1.0.0</p>
+        <p class="text-xs text-gray-500 font-medium">System Online • v2.0.0</p>
       </div>
     </div>
   </div>

@@ -150,11 +150,11 @@
             <div v-if="activeMenu === 'arsip'" class="space-y-4">
               <!-- Aksi Import/Export Arsip -->
               <div class="flex gap-2 mb-2">
-                <input type="file" ref="fileInputArsip" @change="importCSVArsip" accept=".csv" class="hidden" />
+                <input type="file" ref="fileInputArsip" @change="importExcelArsip" accept=".xlsx,.xls" class="hidden" />
                 <button @click="triggerImportArsip" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer" :class="theme.btnAction">
                   <span class="material-symbols-outlined text-sm">upload_file</span> Import
                 </button>
-                <button @click="exportCSVArsip" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer" :class="theme.btnAction">
+                <button @click="exportExcelArsip" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer" :class="theme.btnAction">
                   <span class="material-symbols-outlined text-sm">download</span> Export
                 </button>
               </div>
@@ -351,7 +351,7 @@
     </div>
 
     <!-- MODAL TAMBAH ARSIP -->
-    <div v-if="showTambahModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity bg-black/40 backdrop-blur-sm" @click.self="showTambahModal = false">
+    <div v-if="showTambahModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity" @click.self="showTambahModal = false">
       <div class="rounded-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up" :class="theme.cardBg">
 
         <div class="px-6 py-4 border-b flex justify-between items-center shrink-0" :class="theme.border">
@@ -411,7 +411,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 // Firebase Import (Ditambahkan setDoc dan collection untuk fitur Tambah)
-import { writeBatch, doc, setDoc, collection } from 'firebase/firestore'
+import { doc, setDoc, collection } from 'firebase/firestore'
 import { db } from '../services/firebase'
 
 const router = useRouter()
@@ -654,93 +654,44 @@ const rutePerusahaan = computed(() => ruteStore.lokasiList.filter(r => (!r.kateg
 const rutePribadi = computed(() => ruteStore.lokasiList.filter(r => r.kategori === 'Pribadi').length)
 
 
-/* STREAMING_CHUNK:Configuring CSV Logic... */
-// === IMPORT & EXPORT CSV ARSIP ===
+/* STREAMING_CHUNK:Configuring Excel Import/Export Logic... */
+// === IMPORT & EXPORT EXCEL ARSIP ===
+// Kedua fungsi ini memanggil logic yang sama di store (arsip.js) yang
+// dipakai DataArsipView (mobile), jadi validasi & format hasil export
+// SELALU konsisten antara desktop admin dan mobile.
 function triggerImportArsip() {
   if (fileInputArsip.value) fileInputArsip.value.click()
 }
 
-function exportCSVArsip() {
-  if (arsipStore.arsipList.length === 0) return alert("Tidak ada data arsip untuk diekspor")
-
-  let csvContent = "Nomor Surat,No Polisi,Status,Nama Box\n"
-  arsipStore.arsipList.forEach(row => {
-    const escapeCSV = (str) => {
-      if (!str) return ''
-      return `"${String(str).replace(/"/g, '""')}"`
-    }
-    csvContent += `${row.no_surat},${escapeCSV(row.no_polisi)},${escapeCSV(row.status)},${escapeCSV(row.nama_box)}\n`
-  })
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement("a")
-  link.setAttribute("href", URL.createObjectURL(blob))
-  link.setAttribute("download", `Data_Arsip_${new Date().toISOString().slice(0,10)}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+function exportExcelArsip() {
+  try {
+    arsipStore.exportArsipToExcel()
+  } catch (err) {
+    alert(err.message || "Gagal mengekspor data arsip")
+  }
 }
 
-async function importCSVArsip(event) {
+async function importExcelArsip(event) {
   const file = event.target.files[0]
   if (!file) return
 
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    const text = e.target.result
-    const rows = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0)
-
-    if (rows.length < 2) {
-      alert("File CSV kosong atau format tidak valid")
-      return
+  try {
+    const result = await arsipStore.importArsipFromExcel(file)
+    if (result.errors.length > 0) {
+      console.warn('Baris yang dilewati saat import:\n' + result.errors.join('\n'))
+      alert(`${result.imported} data arsip berhasil diimpor, ${result.errors.length} baris dilewati (detail di console).`)
+    } else {
+      alert(`${result.imported} data arsip berhasil diimpor!`)
     }
-
-    arsipStore.loading = true
-    try {
-      let batch = writeBatch(db)
-      let count = 0
-      let totalImported = 0
-
-      for (let i = 1; i < rows.length; i++) {
-        // [PERBAIKAN]: Memisahkan kolom berdasarkan koma ATAU titik koma
-        const cols = rows[i].split(/[,;]/).map(col => col.replace(/(^"|"$)/g, '').trim())
-
-        if (cols.length >= 2) {
-          const docId = "ARSIP-IMP-" + Date.now() + "-" + i
-          const docRef = doc(db, 'artifacts', 'SatriaApp', 'public', 'data', 'arsip', docId)
-
-          batch.set(docRef, {
-            no_surat: parseInt(cols[0]) || 0,
-            no_polisi: (cols[1] || '').toUpperCase(),
-            status: cols[2] || 'Tersedia',
-            nama_box: cols[3] || '',
-            id_admin: localStorage.getItem('userId') || 'MIGRASI',
-            nama_admin: localStorage.getItem('nama') || 'Admin',
-            created_at: new Date().toISOString()
-          })
-
-          count++
-          totalImported++
-
-          if (count === 400) {
-            await batch.commit()
-            batch = writeBatch(db)
-            count = 0
-          }
-        }
-      }
-      if (count > 0) await batch.commit()
-      await arsipStore.loadArsip()
-      alert(`${totalImported} data arsip berhasil diimpor!`)
-    } catch(err) {
-      console.error("Gagal mengimpor CSV", err)
-      alert("Terjadi error saat memproses file CSV.")
-    } finally {
-      arsipStore.loading = false
-      if (fileInputArsip.value) fileInputArsip.value.value = ''
+  } catch (err) {
+    console.error("Gagal mengimpor Excel", err)
+    if (err.details && err.details.length > 0) {
+      console.warn('Detail baris ditolak:\n' + err.details.join('\n'))
     }
+    alert(err.message || "Terjadi error saat memproses file Excel.")
+  } finally {
+    if (fileInputArsip.value) fileInputArsip.value.value = ''
   }
-  reader.readAsText(file)
 }
 
 /* STREAMING_CHUNK:Configuring Submit Logic... */

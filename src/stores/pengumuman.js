@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '../services/firebase'
-import { collection, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, setDoc, deleteDoc, doc } from 'firebase/firestore'
 
 export const usePengumumanStore = defineStore('pengumuman', () => {
   // Pastikan path berjumlah 5 bagian (ganjil) agar valid di Firestore
@@ -10,32 +10,55 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
   const pengumumanList = ref([])
   const loading = ref(false)
 
-  // 1. Load Data
-  async function loadPengumuman() {
-    loading.value = true
-    try {
-      const snapshot = await getDocs(collection(db, ...pengumumanPath))
-      const rawData = snapshot.docs.map(docu => {
-        const data = docu.data()
-        return {
-          id: docu.id,
-          judul: data.judul || '',
-          isi: data.isi || '',
-          penting: data.status === 'Penting' || data.penting === true,
-          pembuat: data.nama_admin || data.pembuat || '',
-          tanggal: data.tanggal || ''
-        }
-      })
+  // Guard anti-listener-duplikat, sama seperti di arsip.js
+  let unsubPengumuman = null
 
-      // Urutkan dari yang terbaru (Descending)
-      rawData.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())
-
-      pengumumanList.value = rawData
-    } catch (error) {
-      console.error('LOAD PENGUMUMAN ERROR:', error)
-    } finally {
-      loading.value = false
+  function mapPengumumanDoc(docu) {
+    const data = docu.data()
+    return {
+      id: docu.id,
+      judul: data.judul || '',
+      isi: data.isi || '',
+      penting: data.status === 'Penting' || data.penting === true,
+      pembuat: data.nama_admin || data.pembuat || '',
+      tanggal: data.tanggal || ''
     }
+  }
+
+  // 1. Load Data (real-time via onSnapshot)
+  function loadPengumuman() {
+    if (unsubPengumuman) {
+      return Promise.resolve()
+    }
+
+    loading.value = true
+    return new Promise((resolve) => {
+      let firstSnapshot = true
+
+      unsubPengumuman = onSnapshot(
+        collection(db, ...pengumumanPath),
+        (snapshot) => {
+          const rawData = snapshot.docs.map(mapPengumumanDoc)
+
+          // Urutkan dari yang terbaru (Descending)
+          rawData.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())
+
+          pengumumanList.value = rawData
+          loading.value = false
+          if (firstSnapshot) { firstSnapshot = false; resolve() }
+        },
+        (error) => {
+          console.error('LOAD PENGUMUMAN ERROR:', error)
+          loading.value = false
+          if (firstSnapshot) { firstSnapshot = false; resolve() }
+        }
+      )
+    })
+  }
+
+  // Opsional: hentikan listener pengumuman (mis. dipanggil saat logout)
+  function unsubscribePengumuman() {
+    if (unsubPengumuman) { unsubPengumuman(); unsubPengumuman = null }
   }
 
   // 2. Simpan Data (Tambah & Edit)
@@ -55,7 +78,7 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
       const docId = data.id || `PENGUMUMAN-${Date.now()}`
 
       await setDoc(doc(db, ...pengumumanPath, docId), payload, { merge: true })
-      await loadPengumuman()
+      // Tidak perlu await loadPengumuman() lagi -- listener onSnapshot otomatis update
     } catch (error) {
       console.error('SAVE PENGUMUMAN ERROR:', error)
       alert("Gagal menyimpan pengumuman!")
@@ -69,7 +92,6 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
     loading.value = true
     try {
       await deleteDoc(doc(db, ...pengumumanPath, id))
-      await loadPengumuman()
     } catch (error) {
       console.error('DELETE PENGUMUMAN ERROR:', error)
     } finally {
@@ -82,6 +104,7 @@ export const usePengumumanStore = defineStore('pengumuman', () => {
     loading,
     loadPengumuman,
     savePengumuman,
-    deletePengumuman
+    deletePengumuman,
+    unsubscribePengumuman
   }
 })

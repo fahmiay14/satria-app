@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '../services/firebase'
-import { collection, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, setDoc, deleteDoc, doc } from 'firebase/firestore'
 import { useArsipStore } from './arsip' // Kita pinjam fungsi sync dari arsip
 
 export const useJadwalStore = defineStore('jadwal', () => {
@@ -10,31 +10,54 @@ export const useJadwalStore = defineStore('jadwal', () => {
   const loading = ref(false)
   const arsipStore = useArsipStore()
 
-  // Load Data Jadwal
-  async function loadJadwal() {
-    loading.value = true
-    try {
-      const snapshot = await getDocs(collection(db, ...jadwalPath))
-      const rawData = snapshot.docs.map(docu => {
-        const data = docu.data()
-        return {
-          id: docu.id,
-          // Menerjemahkan dari ERD ke format UI
-          title: data.judul_kegiatan || data.title || '',
-          date: data.tanggal || data.date || '',
-          time: data.waktu || data.time || '',
-          location: data.lokasi || data.location || '',
-          type: data.kategori_jadwal || data.type || 'lapangan'
-        }
-      })
+  // Guard anti-listener-duplikat, sama seperti di arsip.js
+  let unsubJadwal = null
 
-      jadwalList.value = rawData
-      arsipStore.triggerSync() // Panggil efek loading bar di bawah
-    } catch (error) {
-      console.error('LOAD JADWAL ERROR:', error)
-    } finally {
-      loading.value = false
+  function mapJadwalDoc(docu) {
+    const data = docu.data()
+    return {
+      id: docu.id,
+      // Menerjemahkan dari ERD ke format UI
+      title: data.judul_kegiatan || data.title || '',
+      date: data.tanggal || data.date || '',
+      time: data.waktu || data.time || '',
+      location: data.lokasi || data.location || '',
+      type: data.kategori_jadwal || data.type || 'lapangan'
     }
+  }
+
+  // Load Data Jadwal (real-time via onSnapshot)
+  // Promise resolve setelah data pertama diterima, listener tetap aktif
+  // di belakang layar untuk sinkronisasi otomatis setelahnya.
+  function loadJadwal() {
+    if (unsubJadwal) {
+      return Promise.resolve()
+    }
+
+    loading.value = true
+    return new Promise((resolve) => {
+      let firstSnapshot = true
+
+      unsubJadwal = onSnapshot(
+        collection(db, ...jadwalPath),
+        (snapshot) => {
+          jadwalList.value = snapshot.docs.map(mapJadwalDoc)
+          arsipStore.triggerSync() // Panggil efek loading bar di bawah
+          loading.value = false
+          if (firstSnapshot) { firstSnapshot = false; resolve() }
+        },
+        (error) => {
+          console.error('LOAD JADWAL ERROR:', error)
+          loading.value = false
+          if (firstSnapshot) { firstSnapshot = false; resolve() }
+        }
+      )
+    })
+  }
+
+  // Opsional: hentikan listener jadwal (mis. dipanggil saat logout)
+  function unsubscribeJadwal() {
+    if (unsubJadwal) { unsubJadwal(); unsubJadwal = null }
   }
 
   // Simpan / Edit Data Jadwal
@@ -53,7 +76,7 @@ export const useJadwalStore = defineStore('jadwal', () => {
       }
       const docId = data.id ? data.id.toString() : `JADWAL-${Date.now()}`
       await setDoc(doc(db, ...jadwalPath, docId), payload, { merge: true })
-      await loadJadwal()
+      // Tidak perlu await loadJadwal() lagi -- listener onSnapshot otomatis update
     } catch (error) {
       console.error('SAVE JADWAL ERROR:', error)
     } finally {
@@ -66,7 +89,6 @@ export const useJadwalStore = defineStore('jadwal', () => {
     loading.value = true
     try {
       await deleteDoc(doc(db, ...jadwalPath, id))
-      await loadJadwal()
     } catch (error) {
       console.error('DELETE JADWAL ERROR:', error)
     } finally {
@@ -79,6 +101,7 @@ export const useJadwalStore = defineStore('jadwal', () => {
     loading,
     loadJadwal,
     saveJadwal,
-    deleteJadwal
+    deleteJadwal,
+    unsubscribeJadwal
   }
 })

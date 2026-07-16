@@ -18,7 +18,7 @@
           <span>{{ username }}</span> 👋
         </h2>
         <p class="text-sm text-blue-100">Selamat Bekerja</p>
-        <p class="text-xs text-blue-200 mt-2">Versi Aplikasi : 3.0.0 (Vue)</p>
+        <p class="text-xs text-blue-200 mt-2">Versi Aplikasi : 2.0.0</p>
       </div>
     </div>
 

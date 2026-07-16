@@ -83,6 +83,21 @@
           Ditemukan <span class="font-bold text-gray-800">{{ resultRoute.length }} titik lokasi perusahaan</span> untuk {{ selectedPetugas }}.
         </p>
 
+        <!-- Ringkasan Total Jarak & Estimasi Waktu Tempuh -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-blue-50 rounded-xl p-3 border border-blue-100">
+            <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wide mb-0.5">Total Jarak</p>
+            <p class="text-lg font-bold text-blue-900">{{ resultTotalDistance.toFixed(2) }} km</p>
+          </div>
+          <div class="bg-amber-50 rounded-xl p-3 border border-amber-100">
+            <p class="text-[10px] text-amber-600 font-bold uppercase tracking-wide mb-0.5">Estimasi Waktu Tempuh</p>
+            <p class="text-lg font-bold text-amber-900">{{ resultTotalTimeLabel }}</p>
+          </div>
+        </div>
+        <p class="text-[10px] text-gray-400 mb-4 -mt-2">
+          *Estimasi waktu dihitung dari jarak garis lurus (Haversine) dengan asumsi kecepatan rata-rata {{ AVG_SPEED_KMH }} km/jam. Waktu tempuh aktual di lapangan dapat berbeda tergantung kondisi jalan &amp; lalu lintas.
+        </p>
+
         <!-- Link Result -->
         <div class="relative mb-5">
           <textarea
@@ -112,7 +127,11 @@
               <span class="text-xs font-bold text-gray-800">Titik Awal (Samsat)</span>
             </div>
 
-            <div class="w-0.5 h-3 bg-gray-200 ml-3"></div>
+            <!-- Penghubung: jarak & estimasi waktu dari Titik Awal ke titik pertama -->
+            <div v-if="resultRoute[0]" class="flex items-center gap-1.5 ml-3 pl-3 border-l-2 border-dashed border-gray-200 py-0.5">
+              <span class="material-symbols-outlined text-[13px] text-gray-400">arrow_downward</span>
+              <span class="text-[10px] text-gray-500 font-medium">{{ resultRoute[0].jarakDariSebelumnya.toFixed(2) }} km · ~{{ formatDuration(resultRoute[0].waktuDariSebelumnya) }}</span>
+            </div>
 
             <template v-for="(loc, index) in resultRoute" :key="loc.id">
               <div class="flex gap-3 items-center">
@@ -121,7 +140,12 @@
                 </div>
                 <span class="text-xs font-medium text-gray-700 truncate">{{ loc.nama }}</span>
               </div>
-              <div v-if="index !== resultRoute.length - 1" class="w-0.5 h-3 bg-gray-200 ml-3"></div>
+
+              <!-- Penghubung: jarak & estimasi waktu ke titik berikutnya -->
+              <div v-if="index !== resultRoute.length - 1" class="flex items-center gap-1.5 ml-3 pl-3 border-l-2 border-dashed border-gray-200 py-0.5">
+                <span class="material-symbols-outlined text-[13px] text-gray-400">arrow_downward</span>
+                <span class="text-[10px] text-gray-500 font-medium">{{ resultRoute[index + 1].jarakDariSebelumnya.toFixed(2) }} km · ~{{ formatDuration(resultRoute[index + 1].waktuDariSebelumnya) }}</span>
+              </div>
             </template>
 
           </div>
@@ -159,6 +183,12 @@ const hasCalculated = ref(false)
 
 const resultRoute = ref()
 const resultLink = ref('')
+const resultTotalDistance = ref(0)
+const resultTotalTimeLabel = ref('')
+
+// Asumsi kecepatan rata-rata petugas di jalan (motor/mobil, kondisi lalu lintas campuran)
+// Dipakai untuk mengonversi jarak Haversine (garis lurus) menjadi estimasi waktu tempuh
+const AVG_SPEED_KMH = 30
 
 onMounted(() => {
   store.loadLokasi()
@@ -180,6 +210,20 @@ function getDistance(lat1, lon1, lat2, lon2) {
     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+// === FORMAT ESTIMASI WAKTU TEMPUH ===
+// totalHours dalam satuan jam (bisa desimal), dikonversi ke format "X jam Y menit"
+function formatDuration(totalHours) {
+  const totalMinutes = Math.round(totalHours * 60)
+  if (totalMinutes < 1) return '< 1 menit'
+
+  const jam = Math.floor(totalMinutes / 60)
+  const menit = totalMinutes % 60
+
+  if (jam === 0) return `${menit} menit`
+  if (menit === 0) return `${jam} jam`
+  return `${jam} jam ${menit} menit`
 }
 
 // === ALGORITMA NEAREST NEIGHBOR ===
@@ -206,6 +250,8 @@ function kalkulasiRute() {
     if (unvisited.length === 0) {
       resultRoute.value = []
       resultLink.value = ''
+      resultTotalDistance.value = 0
+      resultTotalTimeLabel.value = ''
       isCalculating.value = false
       hasCalculated.value = true
       return
@@ -213,6 +259,7 @@ function kalkulasiRute() {
 
     let currentPos = { lat: sLat, lng: sLng }
     let sortedRoute = []
+    let totalDistance = 0
 
     while (unvisited.length > 0) {
       let nearestIndex = -1
@@ -227,7 +274,15 @@ function kalkulasiRute() {
       }
 
       let nextTarget = unvisited[nearestIndex]
-      sortedRoute.push(nextTarget)
+
+      // Simpan jarak & estimasi waktu dari titik sebelumnya menuju titik ini
+      sortedRoute.push({
+        ...nextTarget,
+        jarakDariSebelumnya: minDistance,
+        waktuDariSebelumnya: minDistance / AVG_SPEED_KMH // dalam jam
+      })
+
+      totalDistance += minDistance
       currentPos = { lat: nextTarget.lat, lng: nextTarget.lng }
       unvisited.splice(nearestIndex, 1)
     }
@@ -239,6 +294,8 @@ function kalkulasiRute() {
 
     resultRoute.value = sortedRoute
     resultLink.value = mapUrl
+    resultTotalDistance.value = totalDistance
+    resultTotalTimeLabel.value = formatDuration(totalDistance / AVG_SPEED_KMH)
     isCalculating.value = false
     hasCalculated.value = true
 
