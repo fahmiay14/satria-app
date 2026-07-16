@@ -213,9 +213,9 @@ async function eksekusiHapus() {
 // === EXPORT KE EXCEL (.xlsx) ===
 // Logic pembuatan file (styling, lebar kolom, dst) ada di store supaya
 // hasilnya identik dengan yang di-export dari desktop admin.
-function exportExcel() {
+async function exportExcel() {
   try {
-    store.exportArsipToExcel()
+    await store.exportArsipToExcel()
     showToast('File Excel sedang diunduh', 'info')
   } catch (err) {
     showToast(err.message || 'Gagal mengekspor data', 'error')

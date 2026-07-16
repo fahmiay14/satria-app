@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { db } from '../services/firebase'
-import * as XLSX from 'xlsx-js-style'
+// CATATAN: xlsx-js-style SENGAJA tidak di-import statis di sini.
+// Library ini cukup besar dan hanya dipakai saat import/export arsip, jadi
+// dimuat dinamis (lihat importArsipFromExcel & exportArsipToExcel) supaya
+// tidak ikut membengkakkan bundle utama yang dimuat saat app pertama kali
+// dibuka (penting untuk PWA -- lihat batas precache workbox).
 
 import {
   collection,
@@ -128,13 +132,16 @@ export const useArsipStore = defineStore(
         throw new Error('File harus berformat .xlsx atau .xls')
       }
 
+      // Load library Excel secara dinamis -- baru diunduh browser saat
+      // fitur import benar-benar dipakai, bukan saat app pertama dibuka.
+      const XLSX = await import('xlsx-js-style')
+
       let workbook
       try {
         const buffer = await file.arrayBuffer()
         workbook = XLSX.read(buffer, { type: 'array' })
       } catch (err) {
         console.error('GAGAL BACA FILE EXCEL:', err)
-        // Attach original error as cause for better debugging
         throw new Error('File Excel tidak bisa dibaca / rusak', { cause: err })
       }
 
@@ -241,10 +248,14 @@ export const useArsipStore = defineStore(
        Dipakai bersama oleh DataArsipView (mobile) dan DesktopAdminView
        supaya format hasil export selalu sama di kedua tempat.
     ========================= */
-    function exportArsipToExcel() {
+    async function exportArsipToExcel() {
       if (arsipList.value.length === 0) {
         throw new Error('Tidak ada data arsip untuk diekspor')
       }
+
+      // Load library Excel secara dinamis -- baru diunduh browser saat
+      // fitur export benar-benar dipakai, bukan saat app pertama dibuka.
+      const XLSX = await import('xlsx-js-style')
 
       const headers = ['Nomor Surat', 'No Polisi', 'Status', 'Nama Box']
       const dataRows = arsipList.value.map(item => [
