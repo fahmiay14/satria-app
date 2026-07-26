@@ -22,7 +22,7 @@
           bap<span class="text-blue-300">e</span>nda
         </span>
       </div>
-      <p class="text-[10px] text-blue-200/60 font-bold tracking-[0.2em] uppercase">Versi Aplikasi : 3.0.0 (Vue)</p>
+      <p class="text-[10px] text-blue-200/60 font-bold tracking-[0.2em] uppercase">Versi Aplikasi : 2.0.0</p>
     </div>
 
   </div>

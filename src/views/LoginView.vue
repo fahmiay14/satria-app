@@ -279,7 +279,7 @@
       </div>
 
       <div class="mt-auto pt-6 text-center">
-        <p class="text-xs text-gray-400 font-medium">© 2026 Satria Mobile • v1.0.0</p>
+        <p class="text-xs text-gray-400 font-medium">© 2026 Satria Mobile • v2.0.0</p>
       </div>
 
     </div>
