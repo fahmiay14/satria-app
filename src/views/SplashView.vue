@@ -41,7 +41,7 @@ onMounted(() => {
     const role = localStorage.getItem('role')
 
     if (userId && role) {
-      // Jika sudah pernah login, langsung lempar ke Dashboard
+      // Jika sudah pernah login, langsung lempar ke Dashboard DDDDD
       router.push('/dashboard')
     } else {
       // Jika belum, lempar ke halaman Login
