@@ -351,7 +351,7 @@
     </div>
 
     <!-- MODAL TAMBAH ARSIP -->
-    <div v-if="showTambahModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity bg-black/40 backdrop-blur-sm" @click.self="showTambahModal = false">
+    <div v-if="showTambahModal" class="absolute inset-0 z-[600] flex flex-col justify-center items-center transition-opacity" @click.self="showTambahModal = false">
       <div class="rounded-3xl shadow-2xl w-full max-w-md transform flex flex-col animate-slide-up" :class="theme.cardBg">
 
         <div class="px-6 py-4 border-b flex justify-between items-center shrink-0" :class="theme.border">
